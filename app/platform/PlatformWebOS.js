@@ -118,6 +118,66 @@
         }
     };
 
+    // -- http --
+    // Promise-based fetch wrapper with abort-based timeout and an optional
+    // validate predicate. Rejects with a typed error object:
+    //   {kind: 'http_status'|'http_timeout'|'network'|'validation', detail, raw}
+    // Headers are passed as [[key,val], ...] arrays (mirrors upstream's shape).
+    // webOS 4.0+ Chromium supports fetch + AbortController natively.
+    Platform.http.request = function(args) {
+        var url = args && args.url;
+        if (!url) {
+            return Promise.reject({kind: 'invalid_args', detail: 'url required'});
+        }
+        var method = (args.method || 'GET').toUpperCase();
+        var timeoutMs = typeof args.timeoutMs === 'number' ? args.timeoutMs : 8000;
+        var validate = typeof args.validate === 'function' ? args.validate : null;
+
+        var headers = {};
+        if (args.headers && args.headers.length) {
+            for (var i = 0; i < args.headers.length; i++) {
+                headers[args.headers[i][0]] = args.headers[i][1];
+            }
+        }
+
+        var ctrl = (typeof AbortController === 'function') ? new AbortController() : null;
+        var timer = null;
+        if (ctrl && timeoutMs > 0) {
+            timer = setTimeout(function() { ctrl.abort(); }, timeoutMs);
+        }
+
+        return fetch(url, {
+            method: method,
+            headers: headers,
+            body: args.body || undefined,
+            signal: ctrl ? ctrl.signal : undefined
+        }).then(function(res) {
+            if (timer) { clearTimeout(timer); timer = null; }
+            var ct = res.headers.get('content-type') || '';
+            var parseBody = ct.indexOf('application/json') === 0
+                ? res.text().then(function(t) { try { return JSON.parse(t); } catch (e) { return t; } })
+                : res.text();
+            return parseBody.then(function(body) {
+                if (!res.ok) {
+                    return Promise.reject({kind: 'http_status', status: res.status, detail: res.statusText, raw: body});
+                }
+                if (validate && !validate(body)) {
+                    return Promise.reject({kind: 'validation', status: res.status, raw: body});
+                }
+                var outHeaders = {};
+                res.headers.forEach(function(v, k) { outHeaders[k] = v; });
+                return {status: res.status, headers: outHeaders, body: body};
+            });
+        }).catch(function(err) {
+            if (timer) { clearTimeout(timer); timer = null; }
+            if (err && err.kind) return Promise.reject(err);
+            if (err && err.name === 'AbortError') {
+                return Promise.reject({kind: 'http_timeout', detail: 'timed out after ' + timeoutMs + 'ms'});
+            }
+            return Promise.reject({kind: 'network', detail: err && err.message ? err.message : String(err), raw: err});
+        });
+    };
+
     // -- input --
     // webOS TV remote keycodes (standard webOS-4+ key map).
     // BACK=461 is the dedicated Back button; on the Magic Remote this is
