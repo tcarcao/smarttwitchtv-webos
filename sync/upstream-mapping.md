@@ -27,9 +27,9 @@ must be added here in the same commit that refactors the caller.
 | `keyEvent(key, action)` | (no direct mapping) | skip | synthetic key dispatch; webOS receives keys natively |
 | `KeyboardCheckAndHIde()` | (no direct mapping) | skip | Android-specific keyboard hide |
 | `hideKeyboardFrom()` | (no direct mapping) | skip | Android-specific |
-| `BasexmlHttpGet(url, ...)` | `Platform.http.request({url, ...})` | pending v1.4 | eval-by-name callback → Promise |
-| `XmlHttpGetFull(url, ...)` | `Platform.http.request({url, validate, ...})` | pending v1.4 | 5-check slots → single validate predicate |
-| `mMethodUrlHeaders(url, ...)` | `Platform.http.request({method: 'HEAD', url})` | pending v1.4 | |
+| `BasexmlHttpGet(url, ...)` | `Platform.http.request({url, ...})` | mapped | eval-by-name callback → Promise; both adapters use fetch+AbortController (v1.4) |
+| `XmlHttpGetFull(url, ...)` | `Platform.http.request({url, validate, ...})` | mapped | 5-check slots → single validate predicate; rejects with kind:'validation' (v1.4) |
+| `mMethodUrlHeaders(url, ...)` | `Platform.http.request({method: 'HEAD', url})` | mapped | response.headers object available on success (v1.4) |
 | `StartAuto(uri, playlist, who, resume, player)` | `Platform.player.start({uri, manifestString: playlist, kind: WHO_MAP[who], resumePosition: resume})` | pending v1.6 | `who_called` 0/1/2 → 'live'/'vod'/'clip' (WHO_MAP constant to be defined in `app/specific/PlayHLS.js` at v1.6 implementation; not yet created) |
 | `RestartPlayer(who, resume, player)` | `Platform.player.stop()` then `Platform.player.start({...})` | pending v1.6 | same arg shape as StartAuto minus uri/manifest (reuses current); see StartAuto row |
 | `ReuseFeedPlayer(uri, playlist, who, resume, player)` | `Platform.multiPlayer?.start(...)` | gated | only if capabilities.multiPlayer |

@@ -173,3 +173,32 @@ Adds webOS TV remote keycodes to `Platform.input.keyCodes`: BACK=461, arrows 37-
 - Pressing remote arrow keys should move focus (currently exercised by upstream's existing key handlers; once a slice refactors them to use `Platform.input.keyCodes.UP` etc., the keycode mapping becomes the source of truth).
 - Pressing BACK at the root screen should call `Platform.lifecycle.exit()` (wired in v1.2) → `webOS.platformBack()` → return to launcher.
 - Pressing PLAY/PAUSE during playback (once v1.6 lands) should toggle the player.
+
+## 2026-05-14 — v1.4 Platform.http + browse top live
+
+Implements `Platform.http.request` on both PlatformDesktop and PlatformWebOS — Promise-based wrapper around `fetch` + `AbortController` with typed-error rejections. Adds `app/tests/twitch-top.html` smoke page that hits Twitch's GraphQL with the public web Client-ID and renders the top 10 live streams.
+
+### v1.4 verification
+
+**Code:**
+- `node -c app/platform/PlatformDesktop.js` → syntax OK
+- `node -c app/platform/PlatformWebOS.js` → syntax OK
+- Both adapters have `Platform.http.request = function` (1 each)
+
+**Twitch top-live (Chrome DevTools MCP, real Chrome on macOS):**
+- `/tests/twitch-top.html` loaded; `SMOKE_RESULT.ok === true`; `SMOKE_RESULT.count === 10`; `SMOKE_RESULT.source === 'inline'` (inline GQL query succeeded; persisted fallback not needed)
+- Real Twitch data returned. First stream observed: `zackrawrr` — 37,339 viewers — Just Chatting
+- `statusClass === 'pass'`; 10 `<li>` elements rendered
+- Console: 1 favicon 404 (cosmetic); zero adapter errors
+- Screenshot: `sync/screenshots/v1.4-twitch-top.png` shows the rendered list
+
+**IPK rebuild:** ✅ `dist-ipk/com.fgl27.smarttwitchtv_0.0.1_all.ipk` (546,862 bytes, rebuilt with http impl)
+
+**Upstream-mapping:** 3 rows transitioned `pending v1.4 → mapped`:
+- `BasexmlHttpGet` → `Platform.http.request`
+- `XmlHttpGetFull` → `Platform.http.request` (validate predicate)
+- `mMethodUrlHeaders` → `Platform.http.request({method:'HEAD'})`
+
+(Shim mapping entries for these aren't added yet — they land when upstream callers are refactored in later slices to call `Platform.http.request` directly. The Platform contract is satisfied; the shim's job is legacy-routing.)
+
+**Emulator/Real-TV install:** ⏳ PENDING USER — both devices still offline at execution time.
