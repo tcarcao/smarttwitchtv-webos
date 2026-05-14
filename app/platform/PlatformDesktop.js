@@ -81,6 +81,21 @@
         window.localStorage.removeItem(key);
     };
 
+    // -- input --
+    // Browser keyboard codes mapped to TV-remote concepts. Backspace is
+    // the conventional "back" key in webOS dev; Space doubles as PLAY/PAUSE.
+    Platform.input.keyCodes.BACK  = 8;
+    Platform.input.keyCodes.UP    = 38;
+    Platform.input.keyCodes.DOWN  = 40;
+    Platform.input.keyCodes.LEFT  = 37;
+    Platform.input.keyCodes.RIGHT = 39;
+    Platform.input.keyCodes.ENTER = 13;
+    Platform.input.keyCodes.PLAY  = 32;
+    Platform.input.keyCodes.PAUSE = 32;
+    Platform.input.registerKeys = function() {
+        // Browser delivers all keys natively; nothing to register.
+    };
+
     // -- Bootstrap marker (smoke tests check this) --
     window['PlatformDesktopLoaded'] = true;
 })();

@@ -81,7 +81,21 @@
     record('multiPlayer namespace still null', Platform.multiPlayer === null);
     record('notifications namespace still null', Platform.notifications === null);
 
-    // Tasks 4-5 will append further sections.
+    section('input');
+    record('input.registerKeys() does not throw', (function() {
+        try { Platform.input.registerKeys(); return true; } catch (e) { return false; }
+    })());
+    record('keyCodes.BACK === 8 (Backspace)', Platform.input.keyCodes.BACK === 8);
+    record('keyCodes.UP === 38', Platform.input.keyCodes.UP === 38);
+    record('keyCodes.DOWN === 40', Platform.input.keyCodes.DOWN === 40);
+    record('keyCodes.LEFT === 37', Platform.input.keyCodes.LEFT === 37);
+    record('keyCodes.RIGHT === 39', Platform.input.keyCodes.RIGHT === 39);
+    record('keyCodes.ENTER === 13', Platform.input.keyCodes.ENTER === 13);
+    record('keyCodes.PLAY === 32 (Space)', Platform.input.keyCodes.PLAY === 32);
+    record('keyCodes.PAUSE === 32 (same as PLAY)', Platform.input.keyCodes.PAUSE === 32);
+    record('keyCodes has at least 8 keys', Object.keys(Platform.input.keyCodes).length >= 8);
+
+    // Task 5 will append the player section.
 })();
 </script>
 </body>
