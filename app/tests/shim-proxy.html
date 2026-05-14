@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>PlatformShim smoke test</title>
+    <style>
+        body { font-family: monospace; padding: 1em; }
+        .pass { color: #2a7; }
+        .fail { color: #c33; font-weight: bold; }
+    </style>
+</head>
+<body>
+<h1>PlatformShim → Platform routing</h1>
+<div id="results"></div>
+<script src="../platform/Platform.js"></script>
+<script src="../platform/PlatformShim.js"></script>
+<script>
+(function() {
+    var results = document.getElementById('results');
+    function record(label, ok, detail) {
+        var p = document.createElement('p');
+        p.className = ok ? 'pass' : 'fail';
+        p.textContent = (ok ? 'PASS: ' : 'FAIL: ') + label + (detail ? ' — ' + detail : '');
+        results.appendChild(p);
+    }
+
+    record('window.Android exists', typeof window.Android === 'object' && window.Android !== null);
+
+    // Mapped function: routes to Platform.device.appVersion (which throws PlatformNotImplementedError).
+    try {
+        Android.getversion();
+        record('Android.getversion routes to Platform', false, 'did not throw');
+    } catch (e) {
+        record('Android.getversion routes to Platform',
+               e.name === 'PlatformNotImplementedError' && e.method === 'device.appVersion');
+    }
+
+    // Mapped function: routes to Platform.device.isTV.
+    try {
+        Android.deviceIsTV();
+        record('Android.deviceIsTV routes to Platform', false, 'did not throw');
+    } catch (e) {
+        record('Android.deviceIsTV routes to Platform',
+               e.name === 'PlatformNotImplementedError' && e.method === 'device.isTV');
+    }
+
+    // Unmapped function: shim throws with helpful message.
+    try {
+        Android.NeverImplementedDontMapMe();
+        record('unmapped Android.X throws loudly', false, 'did not throw');
+    } catch (e) {
+        record('unmapped Android.X throws loudly',
+               /not mapped in PlatformShim/.test(e.message),
+               e.message);
+    }
+})();
+</script>
+</body>
+</html>
