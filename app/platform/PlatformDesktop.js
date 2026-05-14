@@ -23,6 +23,65 @@
         throw new Error('PlatformDesktop: Platform.js must load first');
     }
 
+    var Platform = window['Platform'];
+
+    // -- device --
+    Platform.device.name = function() {
+        return navigator.userAgent || 'Desktop';
+    };
+    Platform.device.manufacturer = function() {
+        return 'Desktop';
+    };
+    Platform.device.systemVersion = function() {
+        // Best-effort browser/OS string; falls back to userAgent.
+        return navigator.platform || navigator.userAgent || 'unknown';
+    };
+    Platform.device.isTV = function() {
+        return false;
+    };
+    Platform.device.appVersion = function() {
+        return '0.0.1';
+    };
+
+    // -- log --
+    Platform.log.info = function(msg) {
+        // ES5-style: forward all args via apply.
+        var args = ['[info]', msg];
+        for (var i = 1; i < arguments.length; i++) args.push(arguments[i]);
+        console.log.apply(console, args);
+    };
+    Platform.log.warn = function(msg) {
+        var args = ['[warn]', msg];
+        for (var i = 1; i < arguments.length; i++) args.push(arguments[i]);
+        console.warn.apply(console, args);
+    };
+    Platform.log.error = function(msg, err) {
+        if (err !== undefined) {
+            console.error('[error]', msg, err);
+        } else {
+            console.error('[error]', msg);
+        }
+    };
+
+    // -- storage --
+    Platform.storage.get = function(key) {
+        var v = window.localStorage.getItem(key);
+        if (v === null) return null;
+        // Round-trip JSON for objects; fall back to raw string.
+        try {
+            return JSON.parse(v);
+        } catch (e) {
+            return v;
+        }
+    };
+    Platform.storage.set = function(key, value) {
+        var encoded = typeof value === 'string' ? value : JSON.stringify(value);
+        window.localStorage.setItem(key, encoded);
+    };
+    Platform.storage.remove = function(key) {
+        window.localStorage.removeItem(key);
+    };
+
     // -- Bootstrap marker (smoke tests check this) --
     window['PlatformDesktopLoaded'] = true;
 })();

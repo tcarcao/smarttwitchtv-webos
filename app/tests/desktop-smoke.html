@@ -43,7 +43,45 @@
     record('Hls.isSupported() === true', typeof window.Hls === 'function' && window.Hls.isSupported());
     record('PlatformDesktop registered (PlatformDesktopLoaded flag)', window['PlatformDesktopLoaded'] === true);
 
-    // Subsequent sections will be added by Tasks 3-5 as their surfaces land.
+    section('device');
+    record('device.name() returns non-empty string', typeof Platform.device.name() === 'string' && Platform.device.name().length > 0);
+    record('device.manufacturer() === "Desktop"', Platform.device.manufacturer() === 'Desktop');
+    record('device.systemVersion() returns non-empty string', typeof Platform.device.systemVersion() === 'string' && Platform.device.systemVersion().length > 0);
+    record('device.isTV() === false', Platform.device.isTV() === false);
+    record('device.appVersion() === "0.0.1"', Platform.device.appVersion() === '0.0.1');
+
+    section('log');
+    var logProbed = { info:false, warn:false, error:false };
+    var origInfo = console.log, origWarn = console.warn, origError = console.error;
+    console.log = function() { logProbed.info = true; origInfo.apply(console, arguments); };
+    console.warn = function() { logProbed.warn = true; origWarn.apply(console, arguments); };
+    console.error = function() { logProbed.error = true; origError.apply(console, arguments); };
+    Platform.log.info('smoke info');
+    Platform.log.warn('smoke warn');
+    Platform.log.error('smoke error');
+    console.log = origInfo; console.warn = origWarn; console.error = origError;
+    record('log.info called console.log', logProbed.info === true);
+    record('log.warn called console.warn', logProbed.warn === true);
+    record('log.error called console.error', logProbed.error === true);
+
+    section('storage');
+    var SK = '_smoke_storage_key_' + Date.now();
+    record('storage.get of missing key returns null', Platform.storage.get(SK) === null);
+    Platform.storage.set(SK, {a: 1, b: 'two'});
+    record('storage.set+get round-trips object', JSON.stringify(Platform.storage.get(SK)) === '{"a":1,"b":"two"}');
+    Platform.storage.set(SK, 'plain string');
+    record('storage.set+get round-trips string', Platform.storage.get(SK) === 'plain string');
+    Platform.storage.remove(SK);
+    record('storage.remove clears key', Platform.storage.get(SK) === null);
+
+    section('capabilities');
+    record('capabilities.multiPlayer still false', Platform.capabilities.multiPlayer === false);
+    record('capabilities.hardwareHLS still false', Platform.capabilities.hardwareHLS === false);
+    record('capabilities.surfaceBehindWebView still false', Platform.capabilities.surfaceBehindWebView === false);
+    record('multiPlayer namespace still null', Platform.multiPlayer === null);
+    record('notifications namespace still null', Platform.notifications === null);
+
+    // Tasks 4-5 will append further sections.
 })();
 </script>
 </body>
