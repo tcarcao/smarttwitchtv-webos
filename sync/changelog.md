@@ -41,3 +41,38 @@ Expected on app load:
 - Page may render partially or not at all — both acceptable for v1.0
 
 Behavior: the seam is wired. Implementer-level verification complete.
+
+### v1.0 visual verification (2026-05-14)
+
+Driven by Chrome DevTools MCP against Vite dev server. Chrome on macOS.
+
+**`/tests/platform-stubs.html`** — 14/14 PASS:
+- window.Platform defined
+- capabilities.multiPlayer is false
+- capabilities has all 6 expected keys
+- multiPlayer is null
+- notifications is null
+- 9 × `Platform.X.Y throws` (player.start, player.stop, http.request, device.appVersion, lifecycle.exit, storage.get, log.info, input.registerKeys, codec.supports)
+
+Console emitted exactly 9 `[error] [Platform] Platform.X.Y not implemented` messages from the stub `console.error` calls (one per assertThrows). Plus 1 spurious 404 (favicon, cosmetic).
+
+**`/tests/shim-proxy.html`** — 4/4 PASS:
+- window.Android exists
+- Android.getversion routes to Platform (throws PlatformNotImplementedError method=device.appVersion)
+- Android.deviceIsTV routes to Platform (throws PlatformNotImplementedError method=device.isTV)
+- unmapped Android.X throws loudly (message: "Android.NeverImplementedDontMapMe not mapped in PlatformShim — see sync/upstream-mapping.md")
+
+Console emitted 3 errors: 2 from the routed Platform stubs, 1 from the shim's loud-unmapped path. All three match the expected `[Platform]` / `[PlatformShim]` prefixes.
+
+**`/` (app entry)**:
+- `window.Platform` and `window.Android` both defined (typeof 'object').
+- 55 children rendered into `document.body` — the page DOM successfully constructed.
+- 1 console.error: `[Platform] Platform.device.appVersion not implemented` — emitted by the boot-time `OSInterface_getversion()` → `Android.getversion()` → shim → `Platform.device.appVersion()` chain. Upstream's `try/catch` in `Main.js` catches it (sets `Main_IsOn_OSInterface=0`) and the app proceeds into browser-mode fallback paths.
+- 1 unrelated 401 from a Twitch helix API call without auth (expected in browser/unauth state, not a v1.0 concern).
+
+Conclusion: **the seam is real and behaves exactly as designed**. Upstream's boot-time `Android.X` call routed through the shim to a throwing Platform stub, console-logged loudly, was caught by upstream's existing try/catch, and execution continued. Visual verification closes the open loop from `### v1.0 seam verification`.
+
+Screenshots saved under `sync/screenshots/`:
+- `v1.0-platform-stubs.png`
+- `v1.0-shim-proxy.png`
+- `v1.0-app-boot.png`
