@@ -118,6 +118,28 @@
         }
     };
 
+    // -- input --
+    // webOS TV remote keycodes (standard webOS-4+ key map).
+    // BACK=461 is the dedicated Back button; on the Magic Remote this is
+    // the curved-arrow key. Arrows are W3C standard (37-40). Enter=13 is
+    // the wheel-click. Play=415 / Pause=19 / Stop=413 are the dedicated
+    // media keys on remotes that have them (Magic Remote with playback
+    // pad, otherwise emulated via app UI).
+    Platform.input.keyCodes.BACK  = 461;
+    Platform.input.keyCodes.UP    = 38;
+    Platform.input.keyCodes.DOWN  = 40;
+    Platform.input.keyCodes.LEFT  = 37;
+    Platform.input.keyCodes.RIGHT = 39;
+    Platform.input.keyCodes.ENTER = 13;
+    Platform.input.keyCodes.PLAY  = 415;
+    Platform.input.keyCodes.PAUSE = 19;
+    Platform.input.registerKeys = function() {
+        // webOS delivers all standard remote keys natively as keydown events;
+        // explicit registration (Tizen-style) is not required. If a future
+        // firmware exposes a key that needs webOSDev.registerKey, add the
+        // call here gated on capability detection.
+    };
+
     // -- Bootstrap marker (smoke tests / debugging) --
     window['PlatformWebOSLoaded'] = true;
 })();
