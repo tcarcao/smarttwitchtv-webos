@@ -178,6 +178,145 @@
         });
     };
 
+    // -- player --
+    // hls.js + a single <video> element appended to body. Mirrors
+    // PlatformDesktop's player. Differences vs desktop:
+    //   - No /__usher proxy rewrite — webOS loads from IPK, not Vite, and
+    //     uses webOS WebKit's native CORS (or Luna service if needed later).
+    //   - No `muted = true` autoplay hack — TV apps expect audio on by default;
+    //     Chrome's browser-only autoplay restriction doesn't apply on webOS.
+    var _videoEl = null;
+    var _hls = null;
+
+    function _ensureVideo() {
+        if (_videoEl) return _videoEl;
+        _videoEl = document.createElement('video');
+        _videoEl.id = 'platform-webos-player';
+        _videoEl.setAttribute('playsinline', '');
+        _videoEl.style.cssText = 'position:fixed;left:0;top:0;width:100%;height:100%;background:#000;z-index:1;display:block';
+        document.body.appendChild(_videoEl);
+        return _videoEl;
+    }
+
+    function _destroyHls() {
+        if (_hls) {
+            try { _hls.destroy(); } catch (e) { /* ignore */ }
+            _hls = null;
+        }
+    }
+
+    Platform.player.start = function(args) {
+        if (!args || !args.uri) throw new Error('Platform.player.start: args.uri required');
+        var v = _ensureVideo();
+        v.style.display = 'block';
+        _destroyHls();
+
+        if (window.Hls && window.Hls.isSupported()) {
+            _hls = new window.Hls();
+            _hls.loadSource(args.uri);
+            _hls.attachMedia(v);
+            _hls.on(window.Hls.Events.MANIFEST_PARSED, function() {
+                v.play();
+            });
+        } else {
+            // webOS without MSE support — shouldn't happen on webOS 4.0+,
+            // but fall through to native <video> just in case.
+            v.src = args.uri;
+            v.play();
+        }
+    };
+
+    Platform.player.stop = function() {
+        _destroyHls();
+        if (_videoEl) {
+            _videoEl.pause();
+            _videoEl.removeAttribute('src');
+            _videoEl.load();
+            _videoEl.style.display = 'none';
+        }
+    };
+
+    Platform.player.pause = function() {
+        if (_videoEl) _videoEl.pause();
+    };
+
+    Platform.player.resume = function() {
+        if (_videoEl) _videoEl.play();
+    };
+
+    Platform.player.seek = function(positionMs) {
+        if (_videoEl) _videoEl.currentTime = positionMs / 1000;
+    };
+
+    Platform.player.setQuality = function(/* index */) {
+        // hls.js auto-quality on by default; explicit selection v1.6.x+
+    };
+
+    Platform.player.getQualities = function() {
+        if (!_hls || !_hls.levels) return [];
+        var out = [];
+        for (var i = 0; i < _hls.levels.length; i++) {
+            var lvl = _hls.levels[i];
+            out.push({index: i, label: (lvl.height || 0) + 'p', bitrate: lvl.bitrate || 0});
+        }
+        return out;
+    };
+
+    Platform.player.getCurrentTime = function() {
+        return _videoEl ? Math.floor(_videoEl.currentTime * 1000) : 0;
+    };
+
+    Platform.player.getDuration = function() {
+        if (!_videoEl) return 0;
+        var d = _videoEl.duration;
+        if (!isFinite(d)) return 0;
+        return Math.floor(d * 1000);
+    };
+
+    Platform.player.getState = function() {
+        if (!_videoEl) return 'idle';
+        if (!_videoEl.src && (!_hls || !_hls.url)) return 'idle';
+        if (_videoEl.error) return 'error';
+        if (_videoEl.ended) return 'ended';
+        if (_videoEl.paused) {
+            return _videoEl.readyState >= 2 ? 'paused' : 'loading';
+        }
+        return _videoEl.readyState >= 2 ? 'playing' : 'loading';
+    };
+
+    Platform.player.setPlaybackSpeed = function(rate) {
+        if (!_videoEl || typeof rate !== 'number' || rate <= 0) return;
+        _videoEl.playbackRate = rate;
+    };
+
+    Platform.player.setVolume = function(level) {
+        if (_videoEl) _videoEl.volume = Math.max(0, Math.min(1, level));
+    };
+
+    var _eventHandlers = {};
+    var _errorWired = false;
+    var _endedWired = false;
+    Platform.player.on = function(event, handler) {
+        if (!_eventHandlers[event]) _eventHandlers[event] = [];
+        _eventHandlers[event].push(handler);
+        if (event === 'error' && !_errorWired) {
+            _errorWired = true;
+            _ensureVideo().addEventListener('error', function() {
+                var hs = _eventHandlers['error'] || [];
+                for (var i = 0; i < hs.length; i++) {
+                    hs[i]({kind: 'media', recoverable: false});
+                }
+            });
+        }
+        if (event === 'ended' && !_endedWired) {
+            _endedWired = true;
+            _ensureVideo().addEventListener('ended', function() {
+                var hs = _eventHandlers['ended'] || [];
+                for (var i = 0; i < hs.length; i++) hs[i]();
+            });
+        }
+    };
+
     // -- input --
     // webOS TV remote keycodes (standard webOS-4+ key map).
     // BACK=461 is the dedicated Back button; on the Magic Remote this is
