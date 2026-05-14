@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Authenticating…</title>
+    <style>
+        body { font-family: -apple-system, sans-serif; padding: 2em; text-align: center; }
+        .status { font-family: monospace; padding: 1em; }
+        .pass { color: #2a7; }
+        .fail { color: #c33; }
+    </style>
+</head>
+<body>
+<h1>Authenticating with Twitch…</h1>
+<div id="status" class="status">Reading token…</div>
+
+<script src="thirdparty/hls.min.js"></script>
+<script src="platform/Platform.js"></script>
+<script src="platform/PlatformShim.js"></script>
+<script src="platform/PlatformDesktop.js"></script>
+<script src="platform/PlatformWebOS.js"></script>
+<script src="specific/UsersPlatform.js"></script>
+
+<script>
+(function() {
+    var statusEl = document.getElementById('status');
+    function setStatus(msg, cls) {
+        statusEl.textContent = msg;
+        statusEl.className = 'status ' + (cls || '');
+    }
+
+    UsersPlatform.handleRedirect()
+        .then(function(record) {
+            setStatus('Signed in as ' + record.displayName + ' (' + record.login + '). Returning to app…', 'pass');
+            setTimeout(function() {
+                Platform.lifecycle.loadUrl('/');
+            }, 1500);
+        })
+        .catch(function(err) {
+            setStatus('Sign-in failed: ' + (err.kind || 'error') + ' — ' + (err.detail || JSON.stringify(err)), 'fail');
+        });
+})();
+</script>
+</body>
+</html>
