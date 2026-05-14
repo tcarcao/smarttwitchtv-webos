@@ -11,7 +11,11 @@ export default defineConfig({
             '/__usher': {
                 target: 'https://usher.ttvnw.net',
                 changeOrigin: true,
-                rewrite: p => p.replace(/^\/__usher/, '')
+                rewrite: p => p.replace(/^\/__usher/, ''),
+                headers: {
+                    'Origin': 'https://www.twitch.tv',
+                    'Referer': 'https://www.twitch.tv/'
+                }
             },
             // /__ttvnw/<host>/<path> → https://<host>.ttvnw.net/<path>
             // Handles variant playlists + segment .ts files which live on
@@ -23,7 +27,11 @@ export default defineConfig({
                     const m = req.url && req.url.match(/^\/__ttvnw\/([^/?]+)/);
                     return m ? `https://${m[1]}.ttvnw.net` : 'https://usher.ttvnw.net';
                 },
-                rewrite: p => p.replace(/^\/__ttvnw\/[^/?]+/, '')
+                rewrite: p => p.replace(/^\/__ttvnw\/[^/?]+/, ''),
+                headers: {
+                    'Origin': 'https://www.twitch.tv',
+                    'Referer': 'https://www.twitch.tv/'
+                }
             }
         }
     },
