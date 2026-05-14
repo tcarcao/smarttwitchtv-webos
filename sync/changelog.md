@@ -239,3 +239,30 @@ Adds `PlayHLSPlatform.playLiveChannel(login)` — the v1 reference implementatio
 **Emulator/Real-TV install:** ⏳ PENDING USER — devices still offline at execution time. webOS playback expected to work natively (same code path; `muted = true` is harmless; no Vite proxy needed since `PlatformDesktop` no-ops on webOS and `PlatformWebOS.player` is the throwing stub from Platform.js until v1.6.x ports the player block to webOS).
 
 **Architectural note on webOS player:** v1.6 only validates browser-side. To run PlayHLSPlatform on webOS, we need `Platform.player.*` implementations in `PlatformWebOS.js` too (currently only PlatformDesktop has them — see `_ensureVideo`, `_destroyHls`, etc.). That port is a v1.6.x follow-up. The hls.js library is already vendored and loaded in `index.html`; copying the player block from PlatformDesktop to PlatformWebOS with the same hls.js usage should work since webOS Chromium supports MSE + fetch + AbortController.
+
+## 2026-05-15 — v1.6.x PlatformWebOS player port
+
+Copies the player block from PlatformDesktop to PlatformWebOS. With this, IPK installations have a real `Platform.player.*` on webOS too. Differences vs desktop adapter:
+- No `/__usher` proxy rewrite — webOS isn't running through Vite; usher is fetched directly through TV WebKit (or via a Luna service later if CORS bites).
+- No `muted = true` autoplay hack — TVs expect audio on by default.
+
+**Verification:** syntax OK, 14 Platform.player.* assignments confirmed, IPK rebuilt at 548,960 bytes. Functional verification on webOS device still PENDING USER (devices offline).
+
+## 2026-05-15 — v1.5 Twitch OAuth login (scaffold)
+
+Adds `UsersPlatform` module with OAuth Implicit grant flow, `/auth-callback.html` redirect handler, and synthetic smoke tests. **Real OAuth requires the user to register a Twitch app at <https://dev.twitch.tv/console/apps> and replace `<REPLACE_ME>` in `app/specific/UsersPlatform.js` with the assigned Client-ID. The Twitch console also needs `http://localhost:5173/auth-callback.html` set as a Redirect URI.**
+
+### v1.5 verification
+
+**Synthetic smoke (Chrome DevTools MCP):** 12/13 PASS. The single failure is the expected `TWITCH_APP_CLIENT_ID configured` check (still `<REPLACE_ME>` — passes when user sets the real Client-ID). Passing tests cover:
+- parseRedirectHash: token extraction, scope parsing, token_type, null on empty/non-hash/missing-token (6 tests)
+- storage round-trip: getCurrent returns stored record; logout clears (2 tests)
+- buildAuthUrl shape: starts with Twitch authorize endpoint, contains `response_type=token`, `redirect_uri=`, URL-encoded scopes (4 tests)
+
+**Screenshot:** `sync/screenshots/v1.5-login-smoke.png` — 12 green, 1 red (the expected Client-ID placeholder).
+
+**Real OAuth round-trip:** ⏳ PENDING USER.
+
+**Slice-order note:** v1.5 ran AFTER v1.6 because public-stream playback (v1.6) doesn't depend on auth. Twitch's `streamPlaybackAccessToken` accepts the public web Client-ID anonymously for public streams. Authenticated features (followed channels, subscribed content) will use the v1.5 token in later slices.
+
+**IPK rebuild:** ✅ `dist-ipk/com.fgl27.smarttwitchtv_0.0.1_all.ipk` (551,114 bytes; includes UsersPlatform).
