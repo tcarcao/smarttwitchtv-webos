@@ -19,6 +19,10 @@
         throw new Error('PlatformShim requires Proxy support (webOS 4.0+ / any modern browser)');
     }
 
+    if (!window['Platform']) {
+        throw new Error('PlatformShim: Platform.js must load first');
+    }
+
     // Local alias — Platform.js assigns to window['Platform'] (bracket access for TS friendliness).
     // The closures below capture this local binding, which points to the actual Platform object.
     var Platform = window['Platform'];
@@ -31,7 +35,7 @@
         getDevice:         function() { return Platform.device.name(); },
         getManufacturer:   function() { return Platform.device.manufacturer(); },
         getSDK:            function() { return Platform.device.systemVersion(); },
-        getWebviewVersion: function() { return Platform.device.systemVersion(); }
+        getWebviewVersion: function() { return Platform.device.systemVersion(); } // same as getSDK — Android exposes this as a separate API
 
         // Additional mappings will be added in subsequent slices as the
         // upstream callers are refactored. See sync/upstream-mapping.md.
