@@ -76,3 +76,40 @@ Screenshots saved under `sync/screenshots/`:
 - `v1.0-platform-stubs.png`
 - `v1.0-shim-proxy.png`
 - `v1.0-app-boot.png`
+
+## 2026-05-14 — v1.1 PlatformDesktop adapter
+
+Implements browser-side adapter for Platform (device, log, storage, input, partial player via hls.js). No upstream code applied — pure fork work. The app still cannot run upstream's natural flow end-to-end (CORS + http adapter deferred to v1.4, real Twitch auth to v1.5), but `Platform.player.start({uri})` plays any public HLS stream in Chrome.
+
+### v1.1 visual verification (2026-05-14)
+
+Driven by Chrome DevTools MCP against Vite dev server. Chrome on macOS.
+
+**`/tests/desktop-smoke.html`** — **36/36 PASS**:
+- Bootstrap (3): hls.js loaded, `Hls.isSupported() === true`, `PlatformDesktopLoaded` flag set.
+- device (5): `name`, `manufacturer === "Desktop"`, `systemVersion`, `isTV === false`, `appVersion === "0.0.1"`.
+- log (3): `info`/`warn`/`error` each route to corresponding `console.*` (verified by stub-and-restore probe).
+- storage (4): missing-key returns null, object round-trip, string round-trip, remove clears.
+- capabilities (5): `multiPlayer`/`hardwareHLS`/`surfaceBehindWebView` all `false`; `multiPlayer`/`notifications` namespaces still `null`.
+- input (10): `registerKeys()` no-throw, 8 keyCode value checks (BACK=8, UP=38, DOWN=40, LEFT=37, RIGHT=39, ENTER=13, PLAY=32, PAUSE=32), keyCodes object has ≥ 8 keys.
+- player (6): `idle` before start; `start` no-throw on Mux's `test-streams.mux.dev/x36xhzz/x36xhzz.m3u8`; reached state `playing` in **1000ms**; pause → `paused`; resume → `playing` again; stop → `idle`.
+
+**Direct video playback proof** (post-smoke, restarted via `evaluate_script`):
+- `Platform.player.getState()` → `'playing'`
+- `currentTime` → 11.26s (advancing in real time)
+- `readyState` → 4 (HAVE_ENOUGH_DATA)
+- `paused` → false
+- `videoWidth × videoHeight` → 1920×1080
+- `playing_indicator` (composite: `!paused && currentTime > 0 && readyState >= 2`) → true
+
+**Console**: zero adapter errors. Only emissions:
+- `[warn] smoke warn` and `[error] smoke error` — from the log section's intentional probe, NOT from the adapter.
+- 1 favicon 404 (cosmetic).
+
+No `PlatformNotImplementedError` from any surface PlatformDesktop owns.
+
+Conclusion: **video plays end-to-end through the Platform interface in Chrome**. v1.1 deliverable met. Real Twitch flow still deferred per the v1 breakdown (v1.4 HTTP/CORS, v1.5 login, v1.6 PlayHLS refactor).
+
+Screenshots saved under `sync/screenshots/`:
+- `v1.1-desktop-smoke.png` — full smoke page, all 36 assertions green
+- `v1.1-video-playing.png` — Mux x36xhzz frame rendering in the desktop player
