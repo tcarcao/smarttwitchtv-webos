@@ -9,13 +9,13 @@ Each entry:
 ````
 ## 2026-MM-DD — applied upstream <short-sha>
 Range: <baseline-sha>..<short-sha> in smarttwitchtv-upstream
-Slices touched: v1.X, v2.Y
+Slices touched: none / v1.X, v2.Y
 Files modified here:
   - app/specific/Play.js (mechanical, mapping row already existed)
   - app/specific/Settings.js (mechanical)
   - app/platform/PlatformShim.js (new row added: <Android.X>)
   - sync/upstream-mapping.md (1 new row)
-Conflicts: none / <details>
+Conflicts: none / <details — include upstream and fork line ranges + resolution applied>
 Notes: <anything unusual>
 ````
 

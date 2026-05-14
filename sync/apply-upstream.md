@@ -22,19 +22,21 @@ as the contract.
    - For each commit, note the touched files within `app/`.
 
 3. **For each upstream commit, in order**
-   1. `git show <sha> -- app/` to see the diff.
+   1. In `$UPSTREAM_REPO`: `git show <sha> -- app/` to see the diff.
    2. Classify each touched file:
       - File doesn't exist in fork → straight copy.
       - File exists in fork unchanged → straight apply (overwrite).
       - File exists in fork modified → 3-way merge:
         - If the upstream diff references `Android.X`, look up the corresponding `Platform.X` in `upstream-mapping.md`.
+        - For `gated` rows, wrap the call in `if (Platform.capabilities.<capability>)`; capability name is the namespace before the `?.` in the Platform.X column.
         - Rewrite the diff to use `Platform.X`.
         - Apply.
    3. If any `Android.X` in the diff has no row in `upstream-mapping.md`:
-      - STOP. Surface to user: "Upstream commit <sha> references new `Android.<name>` — please decide mapping (add row, mark `pending v<X>`, or `skip`)."
-      - Do not proceed with this commit until the row exists.
+      - STOP THE ENTIRE RUN. Subsequent commits may depend on this one; applying them now risks a corrupted state.
+      - Surface to user: "Upstream commit <sha> references new `Android.<name>` — please decide mapping (add row, mark `pending v<X>`, or `skip`)."
+      - Do not proceed with any further commits in this range until the blocked commit is resolved.
    4. Run the smoke tests:
-      - `npm run dev` and load `http://localhost:5173/tests/platform-stubs.html` → all green.
+      - `npm run dev` and load `http://localhost:5173/tests/platform-stubs.html` → all green. (Adjust port if `vite.config.js` uses a non-default port.)
       - `http://localhost:5173/tests/shim-proxy.html` → all green.
    5. If green, commit:
       ```
@@ -45,7 +47,7 @@ as the contract.
       ```
 
 4. **Update changelog**
-   Append entry to `sync/changelog.md` per format in that file.
+   After each applied commit (one changelog entry per upstream commit applied), append an entry to `sync/changelog.md` per format in that file.
 
 5. **Report**
    Summarize: commits applied, mapping rows added, conflicts encountered.

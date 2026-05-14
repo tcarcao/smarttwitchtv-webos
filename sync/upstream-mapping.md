@@ -30,18 +30,18 @@ must be added here in the same commit that refactors the caller.
 | `BasexmlHttpGet(url, ...)` | `Platform.http.request({url, ...})` | pending v1.4 | eval-by-name callback → Promise |
 | `XmlHttpGetFull(url, ...)` | `Platform.http.request({url, validate, ...})` | pending v1.4 | 5-check slots → single validate predicate |
 | `mMethodUrlHeaders(url, ...)` | `Platform.http.request({method: 'HEAD', url})` | pending v1.4 | |
-| `StartAuto(uri, playlist, who, resume, player)` | `Platform.player.start({uri, manifestString: playlist, kind: WHO_MAP[who], resumePosition: resume})` | pending v1.6 | `who_called` 0/1/2 → 'live'/'vod'/'clip' |
-| `RestartPlayer(who, resume, player)` | `Platform.player.start(...)` (after `Platform.player.stop()`) | pending v1.6 | |
+| `StartAuto(uri, playlist, who, resume, player)` | `Platform.player.start({uri, manifestString: playlist, kind: WHO_MAP[who], resumePosition: resume})` | pending v1.6 | `who_called` 0/1/2 → 'live'/'vod'/'clip' (WHO_MAP constant to be defined in `app/specific/PlayHLS.js` at v1.6 implementation; not yet created) |
+| `RestartPlayer(who, resume, player)` | `Platform.player.stop()` then `Platform.player.start({...})` | pending v1.6 | same arg shape as StartAuto minus uri/manifest (reuses current); see StartAuto row |
 | `ReuseFeedPlayer(uri, playlist, who, resume, player)` | `Platform.multiPlayer?.start(...)` | gated | only if capabilities.multiPlayer |
 | `PlayPause(state)` | `state ? Platform.player.resume() : Platform.player.pause()` | pending v1.6 | |
 | `PlayPauseChange()` | `Platform.player.getState() === 'playing' ? .pause() : .resume()` | pending v1.6 | |
 | `mseekTo(position)` | `Platform.player.seek(position)` | pending v1.6 | |
 | `stopVideo()` | `Platform.player.stop()` | pending v1.6 | |
-| `mClearSmallPlayer()` | `Platform.multiPlayer?.stop()` | gated | |
+| `mClearSmallPlayer()` | `Platform.multiPlayer?.stop()` | gated | only if capabilities.multiPlayer |
 | `getQualities()` | `Platform.player.getQualities()` | pending v1.6 | sync |
 | `SetQuality(position)` | `Platform.player.setQuality(position)` | pending v1.6 | |
 | `gettime()` | `Platform.player.getCurrentTime()` | pending v1.6 | sync, ms |
-| `gettimepreview()` | (no direct mapping) | skip-v1 | multi-player preview; revisit v4 |
+| `gettimepreview()` | (no direct mapping) | skip | multi-player preview; revisit v4 if multiPlayer capability lands |
 | `getVideoStatus(showLatency, whoCalled)` | `Platform.player.on('progress', handler)` | pending v1.6 | callback-by-name → event subscription |
 | `getVideoQuality(whoCalled)` | `Platform.player.on('qualitychange', handler)` | pending v1.6 | |
 | `getDuration(callback)` | `Platform.player.getDuration()` | pending v1.6 | sync return, drop callback |
@@ -58,7 +58,7 @@ must be added here in the same commit that refactors the caller.
 - **Status:** one of
   - `mapped` — implemented in PlatformShim; routes correctly today
   - `pending vX.Y` — slot reserved for slice vX.Y of the v1 plan
-  - `gated` — only implemented if `Platform.capabilities.X` is true
+  - `gated` — only implemented if `Platform.capabilities.<capability>` is true; the Platform.X column's `?.` chain names the capability (e.g., `Platform.multiPlayer?.start` ⇒ `capabilities.multiPlayer`)
   - `skip` — intentionally not ported (Android-specific concern)
 - **Notes:** any caller-side adjustments (signature changes, sync→async, callback→event)
 
