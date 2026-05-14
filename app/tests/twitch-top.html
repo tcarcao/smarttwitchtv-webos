@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Twitch top live smoke</title>
+    <style>
+        body { font-family: -apple-system, sans-serif; padding: 1em; max-width: 900px; }
+        #status { font-family: monospace; padding: 0.5em; background: #f0f0f0; margin-bottom: 1em; }
+        .pass { color: #2a7; }
+        .fail { color: #c33; font-weight: bold; }
+        ul { list-style: none; padding: 0; }
+        li { padding: 0.4em 0; border-bottom: 1px solid #eee; display: flex; gap: 1em; }
+        .viewer-count { color: #888; min-width: 80px; }
+        .channel { font-weight: bold; min-width: 160px; color: #9147ff; }
+        .game { color: #666; min-width: 140px; }
+        .title { color: #333; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    </style>
+</head>
+<body>
+<h1>Twitch top live (Platform.http smoke)</h1>
+<div id="status">Loading…</div>
+<ul id="streams"></ul>
+
+<script src="../thirdparty/hls.min.js"></script>
+<script src="../platform/Platform.js"></script>
+<script src="../platform/PlatformShim.js"></script>
+<script src="../platform/PlatformDesktop.js"></script>
+<script src="../platform/PlatformWebOS.js"></script>
+
+<script>
+(function() {
+    var TWITCH_CLIENT_ID = 'kimne78kx3ncx6brgo4mv6wki5h1ko';
+    var statusEl = document.getElementById('status');
+    var listEl = document.getElementById('streams');
+
+    function setStatus(text, ok) {
+        statusEl.textContent = text;
+        statusEl.className = ok === true ? 'pass' : (ok === false ? 'fail' : '');
+    }
+
+    function renderStreams(edges) {
+        listEl.innerHTML = '';
+        for (var i = 0; i < edges.length; i++) {
+            var node = edges[i] && edges[i].node;
+            if (!node) continue;
+            var li = document.createElement('li');
+            var viewers = node.viewersCount != null ? node.viewersCount.toLocaleString() : '?';
+            var channel = (node.broadcaster && node.broadcaster.displayName) || '?';
+            var game = (node.game && node.game.name) || '—';
+            var title = node.title || '';
+            li.innerHTML =
+                '<span class="viewer-count">' + viewers + '</span>' +
+                '<span class="channel">' + channel + '</span>' +
+                '<span class="game">' + game + '</span>' +
+                '<span class="title">' + title + '</span>';
+            listEl.appendChild(li);
+        }
+    }
+
+    var query = {
+        operationName: 'BrowsePage_Popular',
+        variables: {
+            limit: 10,
+            platformType: 'all',
+            options: {sort: 'VIEWER_COUNT', recommendationsContext: {platform: 'web'}}
+        },
+        extensions: {
+            persistedQuery: {
+                version: 1,
+                sha256Hash: '267d2d2a64e0a0d6206c4d4d8c93e4f4f1ab0a8af0c5a76e1f47f5e5ebe39d28'
+            }
+        }
+    };
+
+    var inlineQuery = {
+        query: '{streams(first: 10) { edges { node { id title viewersCount broadcaster { displayName login } game { name } } } } }'
+    };
+
+    function tryRequest(payload, label) {
+        return Platform.http.request({
+            url: 'https://gql.twitch.tv/gql',
+            method: 'POST',
+            headers: [['Client-ID', TWITCH_CLIENT_ID], ['Content-Type', 'application/json']],
+            body: JSON.stringify(payload),
+            timeoutMs: 8000,
+            validate: function(body) {
+                return body && body.data && !body.errors;
+            }
+        }).then(function(res) {
+            var streamsRoot = (res.body.data && (res.body.data.streams || res.body.data.browsePage_Popular)) || null;
+            var edges = streamsRoot && streamsRoot.edges;
+            if (!edges || !edges.length) {
+                throw {kind: 'empty', detail: 'no edges in ' + label + ' response'};
+            }
+            setStatus('PASS: ' + label + ' returned ' + edges.length + ' streams', true);
+            renderStreams(edges);
+            window['SMOKE_RESULT'] = {ok: true, count: edges.length, source: label};
+        });
+    }
+
+    tryRequest(inlineQuery, 'inline').catch(function(err1) {
+        return tryRequest(query, 'persisted').catch(function(err2) {
+            var msg = 'FAIL: ' + (err1.kind || 'error') + ' / ' + (err2.kind || 'error');
+            setStatus(msg, false);
+            window['SMOKE_RESULT'] = {ok: false, err1: err1, err2: err2};
+        });
+    });
+})();
+</script>
+</body>
+</html>
