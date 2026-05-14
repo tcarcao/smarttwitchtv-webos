@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Platform stubs smoke test</title>
+    <style>
+        body { font-family: monospace; padding: 1em; }
+        .pass { color: #2a7; }
+        .fail { color: #c33; font-weight: bold; }
+    </style>
+</head>
+<body>
+<h1>Platform stubs</h1>
+<div id="results"></div>
+<script src="../platform/Platform.js"></script>
+<script>
+(function() {
+    var results = document.getElementById('results');
+    function record(label, ok, detail) {
+        var p = document.createElement('p');
+        p.className = ok ? 'pass' : 'fail';
+        p.textContent = (ok ? 'PASS: ' : 'FAIL: ') + label + (detail ? ' — ' + detail : '');
+        results.appendChild(p);
+    }
+    function assertThrows(label, expectedMethod, fn) {
+        try {
+            fn();
+            record(label, false, 'did not throw');
+        } catch (e) {
+            if (e.name === 'PlatformNotImplementedError' && e.method === expectedMethod) {
+                record(label, true);
+            } else {
+                record(label, false, 'wrong error: ' + (e.name || 'Error') + ' ' + e.message + ' (method=' + e.method + ')');
+            }
+        }
+    }
+
+    record('window.Platform defined', typeof window.Platform === 'object' && window.Platform !== null);
+    record('capabilities.multiPlayer is false', window.Platform && window.Platform.capabilities && window.Platform.capabilities.multiPlayer === false);
+    record('multiPlayer is null', window.Platform && window.Platform.multiPlayer === null);
+    record('notifications is null', window.Platform && window.Platform.notifications === null);
+
+    assertThrows('player.start throws', 'player.start', function() { Platform.player.start({}); });
+    assertThrows('player.stop throws', 'player.stop', function() { Platform.player.stop(); });
+    assertThrows('http.request throws', 'http.request', function() { Platform.http.request({}); });
+    assertThrows('device.appVersion throws', 'device.appVersion', function() { Platform.device.appVersion(); });
+    assertThrows('lifecycle.exit throws', 'lifecycle.exit', function() { Platform.lifecycle.exit(); });
+    assertThrows('storage.get throws', 'storage.get', function() { Platform.storage.get('k'); });
+    assertThrows('log.info throws', 'log.info', function() { Platform.log.info('hi'); });
+    assertThrows('input.registerKeys throws', 'input.registerKeys', function() { Platform.input.registerKeys(); });
+    assertThrows('codec.supports throws', 'codec.supports', function() { Platform.codec.supports({}); });
+})();
+</script>
+</body>
+</html>
