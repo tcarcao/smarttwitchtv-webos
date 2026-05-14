@@ -46,9 +46,9 @@
         };
     }
 
-    window.PlatformNotImplementedError = PlatformNotImplementedError;
+    window['PlatformNotImplementedError'] = PlatformNotImplementedError;
 
-    window.Platform = {
+    window['Platform'] = {
         capabilities: {
             multiPlayer: false,
             pictureInPicture: false,
