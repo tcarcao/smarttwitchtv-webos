@@ -202,3 +202,40 @@ Implements `Platform.http.request` on both PlatformDesktop and PlatformWebOS —
 (Shim mapping entries for these aren't added yet — they land when upstream callers are refactored in later slices to call `Platform.http.request` directly. The Platform contract is satisfied; the shim's job is legacy-routing.)
 
 **Emulator/Real-TV install:** ⏳ PENDING USER — both devices still offline at execution time.
+
+## 2026-05-14 — v1.6 Watch live Twitch stream
+
+Adds `PlayHLSPlatform.playLiveChannel(login)` — the v1 reference implementation for end-to-end Twitch live playback through `Platform.http` + `Platform.player`. Browser-validated via Chrome MCP playing zackrawrr's real live stream at 1920×1080. Upstream's `app/specific/PlayHLS.js` is left unchanged for this slice (its refactor would touch many callers and is deferred).
+
+**Slice-order note:** v1.5 (OAuth login) was REORDERED to after v1.6 because playing public live streams does NOT require auth. Twitch's `streamPlaybackAccessToken` GraphQL query accepts the public web Client-ID anonymously. v1.5 will follow next; it's only needed for follower-aware features.
+
+### v1.6 verification
+
+**Code:**
+- `node -c app/specific/PlayHLSPlatform.js` → syntax OK
+- 2 `Platform.http.request` calls (token + manifest)
+- 1 `Platform.player.start` call
+- Two GraphQL paths: persisted PlaybackAccessToken_Template query (inline body, not persistedQuery hash — stable)
+
+**CORS architecture:**
+- Token fetch (gql.twitch.tv): permissive CORS, direct fetch works
+- Multivariant manifest fetch (usher.ttvnw.net): **CORS-restricted**, browser dev uses Vite proxy at `/__usher` with spoofed `Origin: https://www.twitch.tv` and `Referer: https://www.twitch.tv/` headers
+- Variant playlists + segments (video-edge-*.ttvnw.net etc.): empirically work direct from browser with permissive CDN CORS — no proxy needed. Earlier attempts to proxy these through `/__ttvnw` made things worse (got reverted in commit `8a8bbe9`)
+
+**Chrome DevTools MCP (real Chrome on macOS):**
+- Navigated to `/tests/twitch-watch.html`, invoked `window.startWatch('zackrawrr')`
+- Reached `state === 'playing'` in **3493ms** (time-to-play from clicking Play to first decoded frame)
+- After 30s of playback observed: `currentTime = 28.516s`, `readyState = 4` (HAVE_ENOUGH_DATA), `paused = false`, `videoWidth = 1920`, `videoHeight = 1080`, `muted = true`
+- `playing_indicator` (composite: not-paused + currentTime > 0 + readyState ≥ 2) → true
+- `WATCH_SMOKE_RESULT` → `{ok: true, state: 'playing', channel: 'zackrawrr', timeToPlayMs: 3493}`
+- Console: zero adapter errors (only a favicon 404)
+
+**Autoplay note:** `_videoEl.muted = true` was set in `_ensureVideo()` because Chrome blocks unmuted autoplay without a synthetic user gesture. MCP's `evaluate_script` doesn't count. Users would unmute via UI controls in production.
+
+**Screenshot:** `sync/screenshots/v1.6-watch-live.png` — zackrawrr's live stream rendering at 1920×1080.
+
+**IPK rebuild:** ✅ `dist-ipk/com.fgl27.smarttwitchtv_0.0.1_all.ipk` (548,760 bytes, rebuilt with PlayHLSPlatform).
+
+**Emulator/Real-TV install:** ⏳ PENDING USER — devices still offline at execution time. webOS playback expected to work natively (same code path; `muted = true` is harmless; no Vite proxy needed since `PlatformDesktop` no-ops on webOS and `PlatformWebOS.player` is the throwing stub from Platform.js until v1.6.x ports the player block to webOS).
+
+**Architectural note on webOS player:** v1.6 only validates browser-side. To run PlayHLSPlatform on webOS, we need `Platform.player.*` implementations in `PlatformWebOS.js` too (currently only PlatformDesktop has them — see `_ensureVideo`, `_destroyHls`, etc.). That port is a v1.6.x follow-up. The hls.js library is already vendored and loaded in `index.html`; copying the player block from PlatformDesktop to PlatformWebOS with the same hls.js usage should work since webOS Chromium supports MSE + fetch + AbortController.
