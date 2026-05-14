@@ -55,12 +55,11 @@
         for (var i = 1; i < arguments.length; i++) args.push(arguments[i]);
         console.warn.apply(console, args);
     };
-    Platform.log.error = function(msg, err) {
-        if (err !== undefined) {
-            console.error('[error]', msg, err);
-        } else {
-            console.error('[error]', msg);
-        }
+    Platform.log.error = function(msg) {
+        // ES5-style varargs: same shape as log.info / log.warn.
+        var args = ['[error]', msg];
+        for (var i = 1; i < arguments.length; i++) args.push(arguments[i]);
+        console.error.apply(console, args);
     };
 
     // -- storage --
