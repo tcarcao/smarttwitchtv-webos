@@ -199,28 +199,16 @@
         _destroyHls();
 
         if (window.Hls && window.Hls.isSupported()) {
-            // Rewrite the multivariant URL upfront — same logic as Platform.http.request.
+            // Rewrite the multivariant URL to the Vite /__usher proxy. Variant
+            // playlists + segments hit *.ttvnw.net subdomains directly and may
+            // CORS-fail in Chrome dev — full playback is gated by Twitch CDN
+            // signing complexity. On webOS this rewrite is unnecessary (and
+            // PlatformDesktop is not loaded on webOS).
             var startUri = args.uri;
             if (startUri.indexOf('https://usher.ttvnw.net/') === 0) {
                 startUri = startUri.replace('https://usher.ttvnw.net', '/__usher');
             }
-            // Configure hls.js to rewrite any *.ttvnw.net fetch to go through
-            // Vite's /__ttvnw proxy — covers variant playlists and segments.
-            _hls = new window.Hls({
-                xhrSetup: function(xhr, url) {
-                    var ttvnw = url.match(/^https:\/\/([^/]+)\.ttvnw\.net(\/.*)$/);
-                    if (ttvnw) {
-                        var host = ttvnw[1];
-                        var rest = ttvnw[2];
-                        // Special-case usher → /__usher (preserves the dedicated proxy).
-                        if (host === 'usher') {
-                            xhr.open(xhr.__rewriteMethod || 'GET', '/__usher' + rest, true);
-                        } else {
-                            xhr.open(xhr.__rewriteMethod || 'GET', '/__ttvnw/' + host + rest, true);
-                        }
-                    }
-                }
-            });
+            _hls = new window.Hls();
             _hls.loadSource(startUri);
             _hls.attachMedia(v);
             _hls.on(window.Hls.Events.MANIFEST_PARSED, function() {

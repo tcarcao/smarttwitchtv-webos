@@ -8,26 +8,15 @@ export default defineConfig({
         strictPort: true,
         proxy: {
             // /__usher → https://usher.ttvnw.net (multivariant playlist)
+            // CORS bypass for browser dev only. Variant playlists and segments
+            // live on video-edge-*.global.abs.hls.ttvnw.net; those need a
+            // signed-URL-aware proxy or a webOS Luna service — out of v1.6 scope.
+            // For now, /__usher handles the manifest fetch; full Chrome
+            // playback is documented as gated by Twitch CDN signing.
             '/__usher': {
                 target: 'https://usher.ttvnw.net',
                 changeOrigin: true,
                 rewrite: p => p.replace(/^\/__usher/, ''),
-                headers: {
-                    'Origin': 'https://www.twitch.tv',
-                    'Referer': 'https://www.twitch.tv/'
-                }
-            },
-            // /__ttvnw/<host>/<path> → https://<host>.ttvnw.net/<path>
-            // Handles variant playlists + segment .ts files which live on
-            // video-edge-*.global.abs.hls.ttvnw.net and similar subdomains.
-            '/__ttvnw': {
-                target: 'https://placeholder.ttvnw.net',  // overridden by router
-                changeOrigin: true,
-                router: req => {
-                    const m = req.url && req.url.match(/^\/__ttvnw\/([^/?]+)/);
-                    return m ? `https://${m[1]}.ttvnw.net` : 'https://usher.ttvnw.net';
-                },
-                rewrite: p => p.replace(/^\/__ttvnw\/[^/?]+/, ''),
                 headers: {
                     'Origin': 'https://www.twitch.tv',
                     'Referer': 'https://www.twitch.tv/'
