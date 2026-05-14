@@ -97,6 +97,11 @@
         if (!url) {
             return Promise.reject({kind: 'invalid_args', detail: 'url required'});
         }
+        // Browser dev: usher.ttvnw.net doesn't return Access-Control-Allow-Origin.
+        // Vite proxies /__usher → https://usher.ttvnw.net server-side.
+        if (url.indexOf('https://usher.ttvnw.net/') === 0) {
+            url = url.replace('https://usher.ttvnw.net', '/__usher');
+        }
         var method = (args.method || 'GET').toUpperCase();
         var timeoutMs = typeof args.timeoutMs === 'number' ? args.timeoutMs : 8000;
         var validate = typeof args.validate === 'function' ? args.validate : null;

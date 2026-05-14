@@ -5,7 +5,14 @@ export default defineConfig({
     server: {
         port: 5173,
         host: true,
-        strictPort: true
+        strictPort: true,
+        proxy: {
+            '/__usher': {
+                target: 'https://usher.ttvnw.net',
+                changeOrigin: true,
+                rewrite: p => p.replace(/^\/__usher/, '')
+            }
+        }
     },
     build: {
         outDir: '../dist',
