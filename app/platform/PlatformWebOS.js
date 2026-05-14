@@ -68,6 +68,56 @@
         return '0.0.1';
     };
 
+    // -- log --
+    Platform.log.info = function(msg) {
+        var args = ['[info]', msg];
+        for (var i = 1; i < arguments.length; i++) args.push(arguments[i]);
+        console.log.apply(console, args);
+    };
+    Platform.log.warn = function(msg) {
+        var args = ['[warn]', msg];
+        for (var i = 1; i < arguments.length; i++) args.push(arguments[i]);
+        console.warn.apply(console, args);
+    };
+    Platform.log.error = function(msg) {
+        var args = ['[error]', msg];
+        for (var i = 1; i < arguments.length; i++) args.push(arguments[i]);
+        console.error.apply(console, args);
+    };
+
+    // -- storage --
+    // webOS Chromium has full localStorage. Same impl as PlatformDesktop.
+    Platform.storage.get = function(key) {
+        var v = window.localStorage.getItem(key);
+        if (v === null) return null;
+        try {
+            return JSON.parse(v);
+        } catch (e) {
+            return v;
+        }
+    };
+    Platform.storage.set = function(key, value) {
+        var encoded = typeof value === 'string' ? value : JSON.stringify(value);
+        window.localStorage.setItem(key, encoded);
+    };
+    Platform.storage.remove = function(key) {
+        window.localStorage.removeItem(key);
+    };
+
+    // -- lifecycle --
+    // webOS.platformBack() pops navigation; from the root screen it returns
+    // to the Launcher (effective app exit). args.background is ignored on
+    // webOS — the OS controls foreground/background lifecycle.
+    Platform.lifecycle.exit = function(/* args */) {
+        if (window['webOS'] && typeof window['webOS'].platformBack === 'function') {
+            window['webOS'].platformBack();
+        } else if (window['PalmSystem'] && typeof window['PalmSystem'].platformBack === 'function') {
+            window['PalmSystem'].platformBack();
+        } else if (typeof window.close === 'function') {
+            window.close();
+        }
+    };
+
     // -- Bootstrap marker (smoke tests / debugging) --
     window['PlatformWebOSLoaded'] = true;
 })();
