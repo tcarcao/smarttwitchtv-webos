@@ -1,0 +1,16 @@
+{
+    "id": "com.fgl27.smarttwitchtv",
+    "version": "0.0.1",
+    "vendor": "fgl27",
+    "type": "web",
+    "main": "index.html",
+    "title": "SmartTV Twitch",
+    "icon": "icon.png",
+    "largeIcon": "largeIcon.png",
+    "iconColor": "#9147ff",
+    "uiRevision": "2",
+    "appDescription": "Twitch client for LG webOS",
+    "disableBackHistoryAPI": true,
+    "supportTouchMode": "none",
+    "transparent": false
+}
