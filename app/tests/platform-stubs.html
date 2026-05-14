@@ -37,6 +37,15 @@
 
     record('window.Platform defined', typeof window.Platform === 'object' && window.Platform !== null);
     record('capabilities.multiPlayer is false', window.Platform && window.Platform.capabilities && window.Platform.capabilities.multiPlayer === false);
+    record('capabilities has all 6 expected keys', (function() {
+        var c = window.Platform && window.Platform.capabilities;
+        if (!c) return false;
+        var expected = ['multiPlayer','pictureInPicture','nativeNotifications','deepLinks','hardwareHLS','surfaceBehindWebView'];
+        for (var i = 0; i < expected.length; i++) {
+            if (typeof c[expected[i]] !== 'boolean') return false;
+        }
+        return Object.keys(c).length === expected.length;
+    })());
     record('multiPlayer is null', window.Platform && window.Platform.multiPlayer === null);
     record('notifications is null', window.Platform && window.Platform.notifications === null);
 

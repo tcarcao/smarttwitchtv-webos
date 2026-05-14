@@ -14,7 +14,7 @@
  * @property {string} [manifestString]   - pre-cleaned HLS manifest (JS preprocesses upstream of the bridge)
  * @property {number} [resumePosition]   - ms
  * @property {'live'|'vod'|'clip'} kind
- * @property {{bottom?:number,right?:number,left?:number,height?:number,fullscreen?:boolean}} rect
+ * @property {{top?:number,right?:number,bottom?:number,left?:number,width?:number,height?:number,fullscreen?:boolean}} rect
  *
  * @typedef {Object} HttpRequestArgs
  * @property {string} url
@@ -22,7 +22,7 @@
  * @property {Array<[string,string]>} [headers]
  * @property {string} [body]
  * @property {number} [timeoutMs=8000]
- * @property {(body:any)=>boolean} [validate]
+ * @property {(body:string|Object)=>boolean} [validate]   - called with parsed body; return false to reject (Promise rejects with kind:'validation')
  *
  * @typedef {Object} HttpResponse
  * @property {number} status
@@ -59,66 +59,66 @@
         },
 
         player: {
-            start: stub('player.start'),
-            stop: stub('player.stop'),
-            pause: stub('player.pause'),
-            resume: stub('player.resume'),
-            seek: stub('player.seek'),
-            setQuality: stub('player.setQuality'),
-            getQualities: stub('player.getQualities'),
-            getCurrentTime: stub('player.getCurrentTime'),
-            getDuration: stub('player.getDuration'),
-            getState: stub('player.getState'),
-            setPlaybackSpeed: stub('player.setPlaybackSpeed'),
-            setVolume: stub('player.setVolume'),
-            on: stub('player.on')
+            start: stub('player.start'),                     // (PlayerStartArgs) => void
+            stop: stub('player.stop'),                       // () => void
+            pause: stub('player.pause'),                     // () => void
+            resume: stub('player.resume'),                   // () => void
+            seek: stub('player.seek'),                       // (positionMs:number) => void
+            setQuality: stub('player.setQuality'),           // (index:number) => void
+            getQualities: stub('player.getQualities'),       // => Array<{index:number,label:string,bitrate?:number}>
+            getCurrentTime: stub('player.getCurrentTime'),   // => number (ms)
+            getDuration: stub('player.getDuration'),         // => number (ms)
+            getState: stub('player.getState'),               // => 'idle'|'loading'|'playing'|'paused'|'ended'|'error'
+            setPlaybackSpeed: stub('player.setPlaybackSpeed'), // (rate:number) => void
+            setVolume: stub('player.setVolume'),             // (level:number) => void
+            on: stub('player.on')                            // (event:string, handler:Function) => void
         },
 
         multiPlayer: null,
 
         http: {
-            request: stub('http.request')
+            request: stub('http.request')   // (HttpRequestArgs) => Promise<HttpResponse>
         },
 
         input: {
-            registerKeys: stub('input.registerKeys'),
-            keyCodes: {}
+            registerKeys: stub('input.registerKeys'), // () => void; adapter calls platform-specific key registration
+            keyCodes: {}                              // adapter must populate with {BACK, UP, DOWN, LEFT, RIGHT, ENTER, PLAY, PAUSE, ...}
         },
 
         device: {
-            name: stub('device.name'),
-            manufacturer: stub('device.manufacturer'),
-            systemVersion: stub('device.systemVersion'),
-            isTV: stub('device.isTV'),
-            appVersion: stub('device.appVersion')
+            name: stub('device.name'),                       // => string
+            manufacturer: stub('device.manufacturer'),       // => string
+            systemVersion: stub('device.systemVersion'),     // => string
+            isTV: stub('device.isTV'),                       // => boolean
+            appVersion: stub('device.appVersion')            // => string
         },
 
         codec: {
-            supports: stub('codec.supports'),
-            setBlacklist: stub('codec.setBlacklist')
+            supports: stub('codec.supports'),         // ({codec:string,profile?:string,level?:string}) => boolean|'unknown'
+            setBlacklist: stub('codec.setBlacklist') // (codecs:string[]) => void
         },
 
         notifications: null,
 
         lifecycle: {
-            exit: stub('lifecycle.exit'),
-            loadUrl: stub('lifecycle.loadUrl'),
-            getLaunchParams: stub('lifecycle.getLaunchParams'),
-            onResume: stub('lifecycle.onResume'),
-            onSuspend: stub('lifecycle.onSuspend'),
-            setLanguage: stub('lifecycle.setLanguage')
+            exit: stub('lifecycle.exit'),                       // ({background?:boolean}) => void
+            loadUrl: stub('lifecycle.loadUrl'),                 // (url:string) => void
+            getLaunchParams: stub('lifecycle.getLaunchParams'), // => Object|null
+            onResume: stub('lifecycle.onResume'),               // (handler:Function) => void
+            onSuspend: stub('lifecycle.onSuspend'),             // (handler:Function) => void
+            setLanguage: stub('lifecycle.setLanguage')          // (lang:string) => void
         },
 
         storage: {
-            get: stub('storage.get'),
-            set: stub('storage.set'),
-            remove: stub('storage.remove')
+            get: stub('storage.get'),       // (key:string) => any
+            set: stub('storage.set'),       // (key:string, value:any) => void
+            remove: stub('storage.remove')  // (key:string) => void
         },
 
         log: {
-            info: stub('log.info'),
-            warn: stub('log.warn'),
-            error: stub('log.error')
+            info: stub('log.info'),     // (msg:string, ...args:any[]) => void
+            warn: stub('log.warn'),     // (msg:string, ...args:any[]) => void
+            error: stub('log.error')   // (msg:string, err?:Error) => void
         }
     };
 })();
