@@ -19,6 +19,12 @@
 (function() {
     'use strict';
 
+    // Platform detection: no-op on webOS (PlatformWebOS.js, landing in v1.2,
+    // owns those overrides). Loading both adapters would race on Platform.X
+    // assignments and could leave an orphan <video> element from this
+    // adapter's _ensureVideo() call.
+    if (window['webOS']) return;
+
     if (!window['Platform']) {
         throw new Error('PlatformDesktop: Platform.js must load first');
     }
