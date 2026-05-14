@@ -4,7 +4,12 @@
   "private": true,
   "scripts": {
     "dev": "vite",
-    "build": "vite build"
+    "build": "vite build",
+    "build:webos": "bash release/scripts/build-webos.sh",
+    "install:emulator": "ares-install --device emulator dist-ipk/com.fgl27.smarttwitchtv_0.0.1_all.ipk",
+    "install:tv": "ares-install --device webostv dist-ipk/com.fgl27.smarttwitchtv_0.0.1_all.ipk",
+    "launch:emulator": "ares-launch --device emulator com.fgl27.smarttwitchtv",
+    "launch:tv": "ares-launch --device webostv com.fgl27.smarttwitchtv"
   },
   "devDependencies": {
     "vite": "^6.0.0"
