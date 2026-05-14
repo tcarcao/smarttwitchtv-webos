@@ -113,3 +113,40 @@ Conclusion: **video plays end-to-end through the Platform interface in Chrome**.
 Screenshots saved under `sync/screenshots/`:
 - `v1.1-desktop-smoke.png` — full smoke page, all 36 assertions green
 - `v1.1-video-playing.png` — Mux x36xhzz frame rendering in the desktop player
+
+## 2026-05-14 — v1.2 PlatformWebOS boot adapter + IPK packaging
+
+Implements webOS adapter for Platform (device/log/storage/lifecycle.exit). Adds appinfo.json + icons + IPK build script. PlatformDesktop and PlatformWebOS now coexist via complementary `window.webOS` guards.
+
+### v1.2 verification
+
+**Code:**
+- `node -c app/platform/PlatformWebOS.js` → syntax OK
+- Vite still serves all platform/ files (200 on each)
+- 4 contiguous `platform/*.js` script tags in index.html (Platform → Shim → Desktop → WebOS) before `specific/OSInterface.js`
+
+**Icons:**
+- Discovered Task 1 copy from user's LG adaptation produced JPEG files renamed `.png` (would have failed `ares-package` validation). Fixed in commit `154b873` — `sips` converted to real PNG and resized to webOS-recommended dimensions (`icon` 80×80, `largeIcon` 130×130).
+
+**IPK build:** ✅ SUCCESS
+- `npm run build:webos` produced `dist-ipk/com.fgl27.smarttwitchtv_0.0.1_all.ipk`
+- File size: 545,018 bytes (~533 KB)
+- `ares-package` reported "Success"
+
+**Emulator install:** ⏳ PENDING USER
+- Attempted: `ares-install --device emulator` → `ECONNREFUSED 127.0.0.1:6622`
+- Emulator not running at execution time. When the user boots the LG webOS Virtual Box image:
+  ```
+  npm run install:emulator && npm run launch:emulator
+  ```
+
+**Real-TV install:** ⏳ PENDING USER
+- Attempted: `ares-install --device webostv` → connection timeout
+- TV at `192.168.0.140` unreachable at execution time (off or Developer Mode disabled). When the user wakes the TV:
+  ```
+  npm run install:tv && npm run launch:tv
+  ```
+
+**Visual verification on webOS:** PENDING USER. Expected behavior: launcher tile appears with Twitch-purple icon; launching shows the upstream's index.html UI (mostly working in "browser-mode" fallback because http/lifecycle/player aren't fully wired yet); pressing the back key from root closes the app via `Platform.lifecycle.exit()` → `webOS.platformBack()`.
+
+**Chrome MCP desktop-smoke:** Still 36/36 — PlatformWebOS guards on `window.webOS` and no-ops in the browser; nothing changed. (Spot-verified via `curl -s -o /dev/null -w "%{http_code}" http://localhost:5173/platform/PlatformWebOS.js` → 200.)
