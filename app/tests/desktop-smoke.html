@@ -95,7 +95,45 @@
     record('keyCodes.PAUSE === 32 (same as PLAY)', Platform.input.keyCodes.PAUSE === 32);
     record('keyCodes has at least 8 keys', Object.keys(Platform.input.keyCodes).length >= 8);
 
-    // Task 5 will append the player section.
+    section('player');
+    var TEST_URI = 'https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8';
+    record('player.getState() === "idle" before start', Platform.player.getState() === 'idle');
+
+    // Start playback. Then wait up to 10s for state to reach 'playing'.
+    var playerErr = null;
+    try {
+        Platform.player.start({uri: TEST_URI, kind: 'live', rect: {fullscreen: false}});
+    } catch (e) {
+        playerErr = e;
+    }
+    record('player.start did not throw', playerErr === null, playerErr && playerErr.message);
+
+    // Poll for 'playing' state. The smoke page deliberately doesn't block —
+    // it appends a row when the state changes. Chrome MCP validation in
+    // Task 6 polls evaluate_script until 'playing' is observed.
+    var pollMs = 0;
+    var pollInterval = setInterval(function() {
+        pollMs += 250;
+        var state = Platform.player.getState();
+        if (state === 'playing') {
+            clearInterval(pollInterval);
+            record('player reached state="playing" within 10s', true, 'after ' + pollMs + 'ms');
+            // Pause/resume sub-tests now that we know the player is healthy.
+            Platform.player.pause();
+            setTimeout(function() {
+                record('pause then resume reaches state="paused"', Platform.player.getState() === 'paused');
+                Platform.player.resume();
+                setTimeout(function() {
+                    record('resume reaches state="playing" again', Platform.player.getState() === 'playing');
+                    Platform.player.stop();
+                    record('stop reaches state="idle"', Platform.player.getState() === 'idle');
+                }, 500);
+            }, 500);
+        } else if (pollMs >= 10000) {
+            clearInterval(pollInterval);
+            record('player reached state="playing" within 10s', false, 'last state: ' + state);
+        }
+    }, 250);
 })();
 </script>
 </body>
