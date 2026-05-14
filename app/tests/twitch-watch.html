@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Twitch watch live smoke</title>
+    <style>
+        body { font-family: -apple-system, sans-serif; padding: 1em; max-width: 900px; }
+        #status { font-family: monospace; padding: 0.5em; background: #f0f0f0; margin-bottom: 1em; min-height: 1.2em; }
+        .pass { color: #2a7; }
+        .fail { color: #c33; font-weight: bold; }
+        .info { color: #06c; }
+        form { margin-bottom: 1em; }
+        input, button { font-size: 1em; padding: 0.4em; }
+        #log { font-family: monospace; font-size: 0.85em; max-height: 200px; overflow-y: auto; padding: 0.5em; background: #fafafa; border: 1px solid #ddd; }
+        #log p { margin: 0.2em 0; }
+    </style>
+</head>
+<body>
+<h1>Twitch watch live (PlayHLSPlatform smoke)</h1>
+<form id="controls" onsubmit="return false;">
+    <input id="channel" type="text" value="zackrawrr" placeholder="channel login (e.g. zackrawrr)" />
+    <button id="play">Play</button>
+    <button id="stop">Stop</button>
+</form>
+<div id="status">Idle.</div>
+<div id="log"></div>
+
+<script src="../thirdparty/hls.min.js"></script>
+<script src="../platform/Platform.js"></script>
+<script src="../platform/PlatformShim.js"></script>
+<script src="../platform/PlatformDesktop.js"></script>
+<script src="../platform/PlatformWebOS.js"></script>
+<script src="../specific/PlayHLSPlatform.js"></script>
+
+<script>
+(function() {
+    var statusEl = document.getElementById('status');
+    var logEl = document.getElementById('log');
+    var channelEl = document.getElementById('channel');
+    var playBtn = document.getElementById('play');
+    var stopBtn = document.getElementById('stop');
+
+    function setStatus(text, cls) {
+        statusEl.textContent = text;
+        statusEl.className = cls || '';
+    }
+    function log(msg, cls) {
+        var p = document.createElement('p');
+        p.className = cls || '';
+        p.textContent = '[' + new Date().toISOString().slice(11, 19) + '] ' + msg;
+        logEl.appendChild(p);
+        logEl.scrollTop = logEl.scrollHeight;
+    }
+
+    function run(channelLogin) {
+        window['WATCH_SMOKE_RESULT'] = {ok: null, state: 'starting', channel: channelLogin};
+        setStatus('Fetching token for ' + channelLogin + '…', 'info');
+        log('start: ' + channelLogin, 'info');
+
+        var t0 = Date.now();
+        PlayHLSPlatform.playLiveChannel(channelLogin).then(function() {
+            log('Platform.player.start invoked', 'info');
+            setStatus('Token + manifest OK; waiting for playback…', 'info');
+            var pollMs = 0;
+            var interval = setInterval(function() {
+                pollMs += 250;
+                var state = Platform.player.getState();
+                if (state === 'playing') {
+                    clearInterval(interval);
+                    var ttp = (Date.now() - t0);
+                    setStatus('PASS: playing ' + channelLogin + ' (ttp ' + ttp + 'ms)', 'pass');
+                    log('state=playing after ' + pollMs + 'ms; ttp ' + ttp + 'ms', 'pass');
+                    window['WATCH_SMOKE_RESULT'] = {ok: true, state: 'playing', channel: channelLogin, timeToPlayMs: ttp};
+                } else if (pollMs >= 15000) {
+                    clearInterval(interval);
+                    setStatus('FAIL: did not reach playing in 15s (last state: ' + state + ')', 'fail');
+                    log('timeout; last state ' + state, 'fail');
+                    window['WATCH_SMOKE_RESULT'] = {ok: false, state: state, channel: channelLogin, error: 'timeout'};
+                }
+            }, 250);
+        }).catch(function(err) {
+            setStatus('FAIL: ' + (err.kind || 'error') + ' — ' + (err.detail || ''), 'fail');
+            log('error: ' + JSON.stringify(err).slice(0, 400), 'fail');
+            window['WATCH_SMOKE_RESULT'] = {ok: false, channel: channelLogin, error: err};
+        });
+    }
+
+    playBtn.addEventListener('click', function() {
+        var login = (channelEl.value || '').trim();
+        if (!login) { setStatus('Enter a channel login first.', 'fail'); return; }
+        run(login);
+    });
+    stopBtn.addEventListener('click', function() {
+        PlayHLSPlatform.stop();
+        setStatus('Stopped.', '');
+        log('stop', 'info');
+    });
+
+    // Expose for Chrome MCP autoplay convenience.
+    window['startWatch'] = function(login) { run(login || channelEl.value || 'zackrawrr'); };
+})();
+</script>
+</body>
+</html>
