@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Login smoke test</title>
+    <style>
+        body { font-family: monospace; padding: 1em; }
+        .pass { color: #2a7; }
+        .fail { color: #c33; font-weight: bold; }
+    </style>
+</head>
+<body>
+<h1>UsersPlatform smoke test</h1>
+<div id="results"></div>
+
+<script src="../thirdparty/hls.min.js"></script>
+<script src="../platform/Platform.js"></script>
+<script src="../platform/PlatformShim.js"></script>
+<script src="../platform/PlatformDesktop.js"></script>
+<script src="../platform/PlatformWebOS.js"></script>
+<script src="../specific/UsersPlatform.js"></script>
+
+<script>
+(function() {
+    var results = document.getElementById('results');
+    function record(label, ok, detail) {
+        var p = document.createElement('p');
+        p.className = ok ? 'pass' : 'fail';
+        p.textContent = (ok ? 'PASS: ' : 'FAIL: ') + label + (detail ? ' — ' + detail : '');
+        results.appendChild(p);
+    }
+
+    var p1 = UsersPlatform.parseRedirectHash('#access_token=abc123&scope=user%3Aread%3Afollows%20chat%3Aread&token_type=bearer');
+    record('parseRedirectHash extracts token', p1 && p1.token === 'abc123', p1 ? JSON.stringify(p1) : 'null');
+    record('parseRedirectHash extracts 2 scopes', p1 && p1.scopes && p1.scopes.length === 2);
+    record('parseRedirectHash extracts token_type', p1 && p1.tokenType === 'bearer');
+
+    record('parseRedirectHash null for empty', UsersPlatform.parseRedirectHash('') === null);
+    record('parseRedirectHash null for non-hash', UsersPlatform.parseRedirectHash('?foo=bar') === null);
+    record('parseRedirectHash null when missing access_token', UsersPlatform.parseRedirectHash('#foo=bar') === null);
+
+    var stub = {token: 'tok', login: 'me', displayName: 'Me', userId: '42', scopes: ['s'], tokenType: 'bearer', obtainedAt: Date.now()};
+    Platform.storage.set('auth.user', stub);
+    var cur = UsersPlatform.getCurrent();
+    record('getCurrent returns stored record', cur && cur.token === 'tok' && cur.login === 'me');
+    UsersPlatform.logout();
+    record('logout clears stored record', UsersPlatform.getCurrent() === null);
+
+    var url = UsersPlatform.buildAuthUrl();
+    record('buildAuthUrl is the Twitch authorize endpoint', url.indexOf('https://id.twitch.tv/oauth2/authorize?') === 0);
+    record('buildAuthUrl includes response_type=token', url.indexOf('response_type=token') !== -1);
+    record('buildAuthUrl includes redirect_uri', url.indexOf('redirect_uri=') !== -1);
+    record('buildAuthUrl includes scope (URL-encoded space)', url.indexOf('scope=user%3Aread%3Afollows') !== -1);
+
+    var clientIdSet = UsersPlatform.CLIENT_ID && UsersPlatform.CLIENT_ID !== '<REPLACE_ME>';
+    record('TWITCH_APP_CLIENT_ID configured (PASS if user has set it)', clientIdSet, clientIdSet ? UsersPlatform.CLIENT_ID : 'still placeholder — see UsersPlatform.js header');
+
+    var allPass = Array.from(document.querySelectorAll('#results p')).every(function(p) { return p.className === 'pass'; });
+    window['LOGIN_SMOKE_RESULT'] = {ok: allPass, total: document.querySelectorAll('#results p').length};
+})();
+</script>
+</body>
+</html>
