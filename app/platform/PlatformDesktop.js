@@ -108,7 +108,7 @@
         _videoEl = document.createElement('video');
         _videoEl.id = 'platform-desktop-player';
         _videoEl.setAttribute('playsinline', '');
-        _videoEl.setAttribute('controls', '');  // dev affordance; remove later
+        _videoEl.setAttribute('controls', '');  // dev affordance; remove in v1.6 when TV-remote controls land
         _videoEl.style.cssText = 'position:fixed;left:0;top:0;width:100%;height:100%;background:#000;z-index:1;display:block';
         document.body.appendChild(_videoEl);
         return _videoEl;
@@ -207,7 +207,10 @@
     };
 
     Platform.player.setPlaybackSpeed = function(rate) {
-        if (_videoEl) _videoEl.playbackRate = rate;
+        // playbackRate must be > 0 — HTMLMediaElement throws NotSupportedError
+        // on 0 or negative. Silently no-op invalid rates.
+        if (!_videoEl || typeof rate !== 'number' || rate <= 0) return;
+        _videoEl.playbackRate = rate;
     };
 
     Platform.player.setVolume = function(level) {
@@ -216,14 +219,17 @@
 
     // Minimal event subscription. Maps a few hls.js / <video> events into
     // the Platform.player.on('event', handler) shape. v1.6 will harden this.
+    // TODO v1.6: add off(event, handler) — _eventHandlers grows unboundedly.
     var _eventHandlers = {};  // {eventName: [handler, ...]}
+    var _errorWired = false;
+    var _endedWired = false;
     Platform.player.on = function(event, handler) {
         if (!_eventHandlers[event]) _eventHandlers[event] = [];
         _eventHandlers[event].push(handler);
 
         // Lazy-wire DOM/Hls listeners on first subscription. Idempotent.
-        if (event === 'error' && !Platform.player._errorWired) {
-            Platform.player._errorWired = true;
+        if (event === 'error' && !_errorWired) {
+            _errorWired = true;
             _ensureVideo().addEventListener('error', function() {
                 var hs = _eventHandlers['error'] || [];
                 for (var i = 0; i < hs.length; i++) {
@@ -231,8 +237,8 @@
                 }
             });
         }
-        if (event === 'ended' && !Platform.player._endedWired) {
-            Platform.player._endedWired = true;
+        if (event === 'ended' && !_endedWired) {
+            _endedWired = true;
             _ensureVideo().addEventListener('ended', function() {
                 var hs = _eventHandlers['ended'] || [];
                 for (var i = 0; i < hs.length; i++) hs[i]();
