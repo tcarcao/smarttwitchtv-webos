@@ -21,3 +21,21 @@ Notes: <anything unusual>
 
 ## 2026-05-14 — initial seed
 Baseline: upstream commit `f32215518` ("Format changelog entry; update release JS bundle"). No upstream commits applied yet; this fork starts from a pristine copy of upstream `app/`.
+
+### v1.0 seam verification (2026-05-14)
+
+Vite dev server confirms:
+- HTTP 200 on /tests/platform-stubs.html
+- HTTP 200 on /tests/shim-proxy.html
+- HTTP 200 on /platform/Platform.js
+- HTTP 200 on /platform/PlatformShim.js
+- HTTP 200 on / (index.html)
+- Script tags for Platform.js and PlatformShim.js present in index.html in correct order
+
+Visual verification by human: pending Chrome DevTools open by user.
+Expected on app load:
+- console.error messages of the form `[Platform] Platform.X.Y not implemented` (loud surfacing of the seam)
+- Possibly uncaught PlatformNotImplementedError from upstream code paths that don't try/catch
+- Page may render partially or not at all — both acceptable for v1.0
+
+Behavior: the seam is wired. Implementer-level verification complete.
