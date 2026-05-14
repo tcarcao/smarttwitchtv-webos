@@ -150,3 +150,26 @@ Implements webOS adapter for Platform (device/log/storage/lifecycle.exit). Adds 
 **Visual verification on webOS:** PENDING USER. Expected behavior: launcher tile appears with Twitch-purple icon; launching shows the upstream's index.html UI (mostly working in "browser-mode" fallback because http/lifecycle/player aren't fully wired yet); pressing the back key from root closes the app via `Platform.lifecycle.exit()` → `webOS.platformBack()`.
 
 **Chrome MCP desktop-smoke:** Still 36/36 — PlatformWebOS guards on `window.webOS` and no-ops in the browser; nothing changed. (Spot-verified via `curl -s -o /dev/null -w "%{http_code}" http://localhost:5173/platform/PlatformWebOS.js` → 200.)
+
+## 2026-05-14 — v1.3 PlatformWebOS input
+
+Adds webOS TV remote keycodes to `Platform.input.keyCodes`: BACK=461, arrows 37-40, ENTER=13, PLAY=415, PAUSE=19. `registerKeys()` is a no-op on webOS (keys delivered natively).
+
+### v1.3 verification
+
+**Code:**
+- `node -c app/platform/PlatformWebOS.js` → syntax OK
+- 8 `Platform.input.keyCodes.X = N;` assignments
+- 1 `Platform.input.registerKeys = function() {...}` no-op
+- Chrome MCP desktop-smoke: still 36/36 expected (PlatformWebOS no-ops in browser)
+
+**IPK rebuild:** ✅ `dist-ipk/com.fgl27.smarttwitchtv_0.0.1_all.ipk` (544,996 bytes, rebuilt with input block)
+
+**Emulator install:** ⏳ PENDING USER — `ECONNREFUSED 127.0.0.1:6622` (emulator not running at execution time).
+
+**Real-TV install:** ⏳ PENDING USER — connection timed out (TV at `192.168.0.140` unreachable at execution time).
+
+**Device-level verification:** PENDING USER. Once installed on a webOS device:
+- Pressing remote arrow keys should move focus (currently exercised by upstream's existing key handlers; once a slice refactors them to use `Platform.input.keyCodes.UP` etc., the keycode mapping becomes the source of truth).
+- Pressing BACK at the root screen should call `Platform.lifecycle.exit()` (wired in v1.2) → `webOS.platformBack()` → return to launcher.
+- Pressing PLAY/PAUSE during playback (once v1.6 lands) should toggle the player.
