@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>PlatformDesktop smoke test</title>
+    <style>
+        body { font-family: monospace; padding: 1em; max-width: 900px; }
+        .pass { color: #2a7; }
+        .fail { color: #c33; font-weight: bold; }
+        h2 { margin-top: 1.5em; border-bottom: 1px solid #ccc; }
+        #video-container { margin-top: 1em; max-width: 480px; }
+        video { width: 100%; background: #000; }
+    </style>
+</head>
+<body>
+<h1>PlatformDesktop smoke test</h1>
+<div id="results"></div>
+<div id="video-container"></div>
+
+<!-- hls.js + Platform stack (mirrors index.html ordering) -->
+<script src="../thirdparty/hls.min.js"></script>
+<script src="../platform/Platform.js"></script>
+<script src="../platform/PlatformShim.js"></script>
+<script src="../platform/PlatformDesktop.js"></script>
+
+<script>
+(function() {
+    var results = document.getElementById('results');
+    function record(label, ok, detail) {
+        var p = document.createElement('p');
+        p.className = ok ? 'pass' : 'fail';
+        p.textContent = (ok ? 'PASS: ' : 'FAIL: ') + label + (detail ? ' — ' + detail : '');
+        results.appendChild(p);
+    }
+    function section(name) {
+        var h = document.createElement('h2');
+        h.textContent = name;
+        results.appendChild(h);
+    }
+
+    section('Bootstrap');
+    record('hls.js loaded (window.Hls)', typeof window.Hls === 'function');
+    record('Hls.isSupported() === true', typeof window.Hls === 'function' && window.Hls.isSupported());
+    record('PlatformDesktop registered (PlatformDesktopLoaded flag)', window['PlatformDesktopLoaded'] === true);
+
+    // Subsequent sections will be added by Tasks 3-5 as their surfaces land.
+})();
+</script>
+</body>
+</html>
