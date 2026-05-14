@@ -19,6 +19,10 @@
         throw new Error('PlatformShim requires Proxy support (webOS 4.0+ / any modern browser)');
     }
 
+    // Local alias — Platform.js assigns to window['Platform'] (bracket access for TS friendliness).
+    // The closures below capture this local binding, which points to the actual Platform object.
+    var Platform = window['Platform'];
+
     var mapping = {
         // -- Boot / device info --
         getversion:        function() { return Platform.device.appVersion(); },
