@@ -23,8 +23,6 @@
         throw new Error('PlatformDesktop: Platform.js must load first');
     }
 
-    var Platform = window['Platform'];
-
     // -- Bootstrap marker (smoke tests check this) --
     window['PlatformDesktopLoaded'] = true;
 })();
