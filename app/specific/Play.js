@@ -255,14 +255,21 @@ function Play_Start(offline_chat) {
     PlayClip_DontSkipStartAuto = false;
 
     if (!Main_IsOn_OSInterface) {
-        if (enable_embed) {
+        // Platform path takes precedence: when Platform.player is available,
+        // playback flows through Play_onPlayer → OSInterface_StartAuto →
+        // Platform.player.start. The legacy Twitch-embed iframe fallback
+        // (BrowserTestStartLive) only runs if Platform is unavailable.
+        var _platformActive = window['Platform'] && window['Platform'].player;
+        if (!_platformActive && enable_embed) {
             //stop chat embed has its own
             Play_hideChat();
             ChatLive_Clear(0);
             Chat_Disable();
             BrowserTestStartLive(Play_data.data[6]);
         }
-        Play_extractQualitiesTest();
+        if (!_platformActive) {
+            Play_extractQualitiesTest();
+        }
     }
 
     //Play_ResetProxy();
@@ -1186,6 +1193,13 @@ function Play_onPlayer() {
         if (Play_SkipStartAuto) {
             OSInterface_FixViewPosition(0, 1);
         } else {
+            OSInterface_StartAuto(Play_data.AutoUrl, Play_data.playlist, 1, 0, 0);
+        }
+    } else if (!Main_IsOn_OSInterface && Play_isOn && window['Platform'] && window['Platform'].player) {
+        // Platform path (browser/webOS without Android bridge): route through
+        // OSInterface_StartAuto which is refactored to call Platform.player.
+        // who_called=1 means live.
+        if (!Play_SkipStartAuto) {
             OSInterface_StartAuto(Play_data.AutoUrl, Play_data.playlist, 1, 0, 0);
         }
     }

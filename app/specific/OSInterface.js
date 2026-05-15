@@ -485,7 +485,11 @@ function OSInterface_StartAuto(uri, mainPlaylistString, who_called, ResumePositi
     if (Main_IsOn_OSInterface) {
         Android.StartAuto(uri, mainPlaylistString, who_called, ResumePosition, player);
     } else if (window['Platform'] && window['Platform'].player) {
-        var kindMap = ['live', 'vod', 'clip'];
+        // who_called values used by upstream callers (see grep across specific/):
+        //   1 = live (Play.js, PlayExtra.js, PlayEtc.js, PlayMulti.js)
+        //   2 = vod  (PlayVod.js)
+        //   3 = clip (PlayClip.js)
+        var kindMap = {1: 'live', 2: 'vod', 3: 'clip'};
         window['Platform'].player.start({
             uri: uri,
             manifestString: mainPlaylistString,
