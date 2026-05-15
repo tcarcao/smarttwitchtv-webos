@@ -46,7 +46,10 @@
         return false;
     };
     Platform.device.appVersion = function() {
-        return '0.0.1';
+        // High version so upstream's "APK Update available" check (which
+        // compares against a published latest version) treats us as current.
+        // Our actual fork version is tracked in package.json + git.
+        return '999.99.99';
     };
 
     // -- log --
