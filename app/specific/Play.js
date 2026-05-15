@@ -255,21 +255,14 @@ function Play_Start(offline_chat) {
     PlayClip_DontSkipStartAuto = false;
 
     if (!Main_IsOn_OSInterface) {
-        // Platform path takes precedence: when Platform.player is available,
-        // playback flows through Play_onPlayer → OSInterface_StartAuto →
-        // Platform.player.start. The legacy Twitch-embed iframe fallback
-        // (BrowserTestStartLive) only runs if Platform is unavailable.
-        var _platformActive = window['Platform'] && window['Platform'].player;
-        if (!_platformActive && enable_embed) {
+        if (enable_embed) {
             //stop chat embed has its own
             Play_hideChat();
             ChatLive_Clear(0);
             Chat_Disable();
             BrowserTestStartLive(Play_data.data[6]);
         }
-        if (!_platformActive) {
-            Play_extractQualitiesTest();
-        }
+        Play_extractQualitiesTest();
     }
 
     //Play_ResetProxy();
@@ -793,11 +786,7 @@ var Play_loadDataId = 0;
 function Play_loadData(synchronous) {
     //Main_Log('Play_loadData');
 
-    // Platform path runs the SAME chain as Android — fetch real token+manifest
-    // via OSInterface_XmlHttpGetFull (which routes to Platform.http when not
-    // on Android). Without this, upstream's browser fallback would synthesize
-    // fake qualities (Play_loadDataSuccessFake) and skip the real fetch.
-    if (Main_IsOn_OSInterface || (window['Platform'] && window['Platform'].http)) {
+    if (Main_IsOn_OSInterface) {
         Play_loadDataId = new Date().getTime();
 
         //On resume to avoid out of sync resumes we run PP synchronous
@@ -1199,13 +1188,6 @@ function Play_onPlayer() {
         } else {
             OSInterface_StartAuto(Play_data.AutoUrl, Play_data.playlist, 1, 0, 0);
         }
-    } else if (!Main_IsOn_OSInterface && Play_isOn && window['Platform'] && window['Platform'].player) {
-        // Platform path (browser/webOS without Android bridge): route through
-        // OSInterface_StartAuto which is refactored to call Platform.player.
-        // who_called=1 means live.
-        if (!Play_SkipStartAuto) {
-            OSInterface_StartAuto(Play_data.AutoUrl, Play_data.playlist, 1, 0, 0);
-        }
     }
 
     if (Play_ChatEnable && !Play_isChatShown()) {
@@ -1375,11 +1357,6 @@ function Play_PreshutdownStream(closePlayer) {
             if (!Play_PreviewId) OSInterface_stopVideo();
             else OSInterface_mClearSmallPlayer();
         }
-    } else if (closePlayer && window['Platform'] && window['Platform'].player) {
-        // Platform path (browser/webOS without Android bridge): stop our
-        // <video> element via OSInterface_stopVideo (refactored to route
-        // through Platform.player.stop()).
-        if (!Play_PreviewId) OSInterface_stopVideo();
     }
 
     if (closePlayer) {
