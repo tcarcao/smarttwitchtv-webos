@@ -197,6 +197,29 @@
         // Browser delivers all keys natively; nothing to register.
     };
 
+    // -- lifecycle (browser dev — mostly no-op; webOS has its own adapter) --
+    Platform.lifecycle.exit = function(args) {
+        // Browser can't actually exit; closest is back-history pop or close.
+        // No-op so upstream's BACK-twice doesn't error.
+        void args;
+    };
+    Platform.lifecycle.loadUrl = function(url) {
+        // In-app navigation — just set location.
+        if (url) window.location.href = url;
+    };
+    Platform.lifecycle.getLaunchParams = function() {
+        return null;  // no deep-link payload in browser
+    };
+    Platform.lifecycle.onResume = function(/* handler */) {};
+    Platform.lifecycle.onSuspend = function(/* handler */) {};
+    Platform.lifecycle.setLanguage = function(/* lang */) {
+        // Browser uses Accept-Language header; nothing app-side to do.
+    };
+
+    // -- codec (browser doesn't expose codec quirks — no-op + 'unknown') --
+    Platform.codec.supports = function(/* args */) { return 'unknown'; };
+    Platform.codec.setBlacklist = function(/* codecs */) {};
+
     // -- player --
     // hls.js + a single <video> element appended to body. The element is
     // created on first start(); subsequent start() reuses it after destroying
