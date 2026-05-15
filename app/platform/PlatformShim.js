@@ -274,6 +274,11 @@
             });
         },
         BasexmlHttpGet: function(urlString, timeout, postMessage, Method, JsonHeadersArray, callback, checkResult, key, callBackSuccess, callBackError) {
+            // Java's BasexmlHttpGet callback invocation:
+            //   callback(result, key, callBackSuccess, callBackError, checkResult)
+            // Both Main_CheckBasexmlHttpGet and Main_CheckFullxmlHttpGet
+            // (which is actually called by BasexmlHttpGet despite the name)
+            // have signature (result, key, callbackSuccess, calbackError, checkResult).
             var headers = _parseHeaders(JsonHeadersArray);
             Platform.http.request({
                 url: urlString,
@@ -284,12 +289,12 @@
             }).then(function(res) {
                 var bodyStr = typeof res.body === 'string' ? res.body : JSON.stringify(res.body);
                 var resultStr = _buildResult(res.status, urlString, bodyStr, checkResult);
-                _invokeCallback(callback, [resultStr, checkResult, key, callBackSuccess]);
+                _invokeCallback(callback, [resultStr, key, callBackSuccess, callBackError, checkResult]);
             }).catch(function(err) {
                 var status = err && err.status ? err.status : 0;
                 var detail = err && err.detail ? err.detail : '';
                 var resultStr = _buildResult(status, urlString, detail, checkResult);
-                _invokeCallback(callBackError || callback, [resultStr, checkResult, key, callBackSuccess]);
+                _invokeCallback(callback, [resultStr, key, callBackSuccess, callBackError, checkResult]);
             });
         },
         mMethodUrlHeaders: function(urlString, timeout, postMessage, Method/* , checkResult */) {
