@@ -97,12 +97,20 @@
         if (!url) {
             return Promise.reject({kind: 'invalid_args', detail: 'url required'});
         }
-        // Browser dev: usher.ttvnw.net doesn't return Access-Control-Allow-Origin.
-        // Vite proxies /__usher → https://usher.ttvnw.net server-side.
+        // Browser dev CORS bypass via universal /__proxy. Any Twitch-family
+        // host gets routed server-side by Vite middleware which spoofs the
+        // Origin/Referer headers to twitch.tv. Keep /__usher as a separate
+        // path-based proxy because hls.js's internal XHRs (segments) need
+        // a path-form URL to construct relative variant playlist URLs.
+        var method = (args.method || 'GET').toUpperCase();
         if (url.indexOf('https://usher.ttvnw.net/') === 0) {
             url = url.replace('https://usher.ttvnw.net', '/__usher');
+        } else if (/^https:\/\/(?:[^/]+\.)?(?:twitch\.tv|ttvnw\.net|jtvnw\.net)\//.test(url)) {
+            // Universal proxy for other Twitch endpoints (gql, helix, etc.).
+            // Even if they're already CORS-friendly, going through the proxy
+            // is harmless and gives us a single chokepoint to debug.
+            url = '/__proxy?url=' + encodeURIComponent(url);
         }
-        var method = (args.method || 'GET').toUpperCase();
         var timeoutMs = typeof args.timeoutMs === 'number' ? args.timeoutMs : 8000;
         var validate = typeof args.validate === 'function' ? args.validate : null;
 
