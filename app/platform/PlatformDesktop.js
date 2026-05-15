@@ -235,7 +235,11 @@
         _videoEl.muted = true;  // Chrome blocks unmuted autoplay; users unmute via UI
         // No controls=true — upstream's overlay UI is the user-facing player
         // controls; native browser controls would compete and look wrong.
-        _videoEl.style.cssText = 'position:fixed;left:0;top:0;width:100%;height:100%;background:#000;z-index:0;display:block';
+        // z-index sits ABOVE upstream's tile thumbnails (which use z-index ≤1)
+        // so the player visibly fills the tile rect during preview/playback.
+        // Upstream's overlay UI (controls, info bars, chat) uses higher
+        // z-indices and remains on top.
+        _videoEl.style.cssText = 'position:fixed;left:0;top:0;width:100%;height:100%;background:#000;z-index:2;display:block';
         document.body.appendChild(_videoEl);
         return _videoEl;
     }
