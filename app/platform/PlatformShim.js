@@ -106,7 +106,7 @@
                 rect: {fullscreen: true}
             });
         },
-        RestartPlayer: function(who_called, ResumePosition, /* player */) {
+        RestartPlayer: function(/* who_called, ResumePosition, player */) {
             Platform.player.stop();
             // The caller has to re-supply uri/playlist; in upstream the
             // RestartPlayer path is followed by another StartAuto. Just stop.
@@ -218,10 +218,11 @@
         SetFullScreenPosition: function(/* pos */) {},
         SetFullScreenSize: function(/* size */) {},
         msetPlayer: function(/* surface, FullScreen */) {},
-        StartFeedPlayer: function(uri, mainPlaylistString, position, resumePosition, isVod) {
+        StartFeedPlayer: function(uri, mainPlaylistString, /* position */ _position, resumePosition, isVod) {
             // Used for hover-preview-on-feed. Without a real multi-player,
             // we route into the main player (same approach as the BACK→list
-            // continued-playback flow). Position/isVod ignored.
+            // continued-playback flow). _position ignored.
+            void _position;
             if (uri) {
                 Platform.player.start({
                     uri: uri,
