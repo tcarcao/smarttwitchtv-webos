@@ -793,7 +793,11 @@ var Play_loadDataId = 0;
 function Play_loadData(synchronous) {
     //Main_Log('Play_loadData');
 
-    if (Main_IsOn_OSInterface) {
+    // Platform path runs the SAME chain as Android — fetch real token+manifest
+    // via OSInterface_XmlHttpGetFull (which routes to Platform.http when not
+    // on Android). Without this, upstream's browser fallback would synthesize
+    // fake qualities (Play_loadDataSuccessFake) and skip the real fetch.
+    if (Main_IsOn_OSInterface || (window['Platform'] && window['Platform'].http)) {
         Play_loadDataId = new Date().getTime();
 
         //On resume to avoid out of sync resumes we run PP synchronous
