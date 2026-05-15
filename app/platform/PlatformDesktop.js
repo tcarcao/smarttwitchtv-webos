@@ -204,8 +204,10 @@
         void args;
     };
     Platform.lifecycle.loadUrl = function(url) {
-        // In-app navigation — just set location.
-        if (url) window.location.href = url;
+        // No-op for browser dev — upstream sometimes uses this to deep-link
+        // into a Twitch web page, but in our dev env we want to stay in the
+        // app. webOS adapter uses the OS deep-link API; this stub is browser-only.
+        console.log('[PlatformDesktop] lifecycle.loadUrl no-op for', url && url.slice(0, 80));
     };
     Platform.lifecycle.getLaunchParams = function() {
         return null;  // no deep-link payload in browser
