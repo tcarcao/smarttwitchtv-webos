@@ -118,8 +118,9 @@
             }
             var hB64 = '';
             try {
-                // btoa expects a binary string; UTF-8 encode first.
-                hB64 = btoa(unescape(encodeURIComponent(JSON.stringify(hObj))));
+                // Twitch headers are ASCII (Client-ID, Authorization Bearer X);
+                // btoa(JSON.stringify) is safe without the UTF-8 dance.
+                hB64 = btoa(JSON.stringify(hObj));
             } catch (e) {
                 hB64 = '';
             }
