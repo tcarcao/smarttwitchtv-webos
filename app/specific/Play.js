@@ -1375,6 +1375,11 @@ function Play_PreshutdownStream(closePlayer) {
             if (!Play_PreviewId) OSInterface_stopVideo();
             else OSInterface_mClearSmallPlayer();
         }
+    } else if (closePlayer && window['Platform'] && window['Platform'].player) {
+        // Platform path (browser/webOS without Android bridge): stop our
+        // <video> element via OSInterface_stopVideo (refactored to route
+        // through Platform.player.stop()).
+        if (!Play_PreviewId) OSInterface_stopVideo();
     }
 
     if (closePlayer) {
