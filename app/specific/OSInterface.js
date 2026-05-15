@@ -123,14 +123,23 @@ function OSInterface_Settings_SetPingWarning(warning) {
 //Android specific: false
 //Allows to change the main player quality
 function OSInterface_SetQuality(position) {
-    if (Main_IsOn_OSInterface) Android.SetQuality(position);
+    if (Main_IsOn_OSInterface) {
+        Android.SetQuality(position);
+    } else if (window['Platform'] && window['Platform'].player) {
+        window['Platform'].player.setQuality(position);
+    }
 }
 
 //public String getQualities()
 //Android specific: true
 //Allows to get the stream data, that if called from JS will fail do to CORS error
 function OSInterface_getQualities() {
-    return Android.getQualities();
+    if (Main_IsOn_OSInterface) {
+        return Android.getQualities();
+    } else if (window['Platform'] && window['Platform'].player) {
+        return JSON.stringify(window['Platform'].player.getQualities());
+    }
+    return '';
 }
 
 //public void BaseXmlHttpGet(String urlString, int timeout, String postMessage, String Method, String JsonHeadersArray,
@@ -152,28 +161,84 @@ function OSInterface_XmlHttpGetFull(
     callBackSuccess,
     callBackError
 ) {
-    try {
-        Android.XmlHttpGetFull(
-            urlString,
-            timeout,
-            postMessage,
-            Method,
-            JsonHeadersArray,
-            callback,
-            !checkResult ? 0 : checkResult,
-            check_1,
-            check_2,
-            check_3,
-            check_4,
-            check_5,
-            callBackSuccess,
-            callBackError
-        );
-    } catch (e) {
-        // prettier-ignore
-        eval(callbackSuccess)(// jshint ignore:line
-            null
-        );
+    if (Main_IsOn_OSInterface) {
+        try {
+            Android.XmlHttpGetFull(
+                urlString,
+                timeout,
+                postMessage,
+                Method,
+                JsonHeadersArray,
+                callback,
+                !checkResult ? 0 : checkResult,
+                check_1,
+                check_2,
+                check_3,
+                check_4,
+                check_5,
+                callBackSuccess,
+                callBackError
+            );
+        } catch (e) {
+            // prettier-ignore
+            eval(callBackSuccess)(// jshint ignore:line
+                null
+            );
+        }
+    } else if (window['Platform'] && window['Platform'].http) {
+        var headersArr = [];
+        if (JsonHeadersArray) {
+            try {
+                var parsed = JSON.parse(JsonHeadersArray);
+                if (Array.isArray(parsed)) {
+                    headersArr = parsed;
+                } else if (parsed && typeof parsed === 'object') {
+                    for (var k in parsed) {
+                        if (Object.prototype.hasOwnProperty.call(parsed, k)) {
+                            headersArr.push([k, parsed[k]]);
+                        }
+                    }
+                }
+            } catch (e) {
+                // headers not parseable — proceed with no extras
+            }
+        }
+        window['Platform'].http.request({
+            url: urlString,
+            method: (Method || 'GET').toUpperCase(),
+            headers: headersArr,
+            body: postMessage || undefined,
+            timeoutMs: timeout || 8000
+        }).then(function(res) {
+            var bodyStr = typeof res.body === 'string' ? res.body : JSON.stringify(res.body);
+            var resultStr = JSON.stringify({
+                status: res.status,
+                responseText: bodyStr,
+                checkResult: checkResult
+            });
+            try {
+                if (typeof window[callback] === 'function') {
+                    window[callback](resultStr, checkResult, check_1, check_2, check_3, check_4, check_5, callBackSuccess);
+                }
+            } catch (cbErr) {
+                console.error('[OSInterface_XmlHttpGetFull] callback', callback, 'threw', cbErr);
+            }
+        }).catch(function(err) {
+            var errStr = JSON.stringify({
+                status: err && err.status ? err.status : 0,
+                responseText: err && err.detail ? err.detail : '',
+                checkResult: checkResult,
+                kind: err && err.kind ? err.kind : 'network'
+            });
+            var errCbName = callBackError || callback;
+            try {
+                if (typeof window[errCbName] === 'function') {
+                    window[errCbName](errStr, checkResult, check_1, check_2, check_3, check_4, check_5, callBackSuccess);
+                }
+            } catch (cbErr) {
+                console.error('[OSInterface_XmlHttpGetFull] error callback', errCbName, 'threw', cbErr);
+            }
+        });
     }
 }
 
@@ -192,18 +257,74 @@ function OSInterface_BaseXmlHttpGet(
     callBackSuccess,
     calBackError
 ) {
-    Android.BasexmlHttpGet(
-        urlString,
-        timeout,
-        postMessage,
-        Method,
-        JsonHeadersArray,
-        callback,
-        !checkResult ? 0 : checkResult,
-        !key ? 0 : key,
-        callBackSuccess,
-        calBackError
-    );
+    if (Main_IsOn_OSInterface) {
+        Android.BasexmlHttpGet(
+            urlString,
+            timeout,
+            postMessage,
+            Method,
+            JsonHeadersArray,
+            callback,
+            !checkResult ? 0 : checkResult,
+            !key ? 0 : key,
+            callBackSuccess,
+            calBackError
+        );
+    } else if (window['Platform'] && window['Platform'].http) {
+        var headersArr = [];
+        if (JsonHeadersArray) {
+            try {
+                var parsed = JSON.parse(JsonHeadersArray);
+                if (Array.isArray(parsed)) {
+                    headersArr = parsed;
+                } else if (parsed && typeof parsed === 'object') {
+                    for (var k in parsed) {
+                        if (Object.prototype.hasOwnProperty.call(parsed, k)) {
+                            headersArr.push([k, parsed[k]]);
+                        }
+                    }
+                }
+            } catch (e) {
+                // headers not parseable — proceed with no extras
+            }
+        }
+        window['Platform'].http.request({
+            url: urlString,
+            method: (Method || 'GET').toUpperCase(),
+            headers: headersArr,
+            body: postMessage || undefined,
+            timeoutMs: timeout || 8000
+        }).then(function(res) {
+            var bodyStr = typeof res.body === 'string' ? res.body : JSON.stringify(res.body);
+            var resultStr = JSON.stringify({
+                status: res.status,
+                responseText: bodyStr,
+                checkResult: checkResult
+            });
+            try {
+                if (typeof window[callback] === 'function') {
+                    window[callback](resultStr, checkResult, key, callBackSuccess);
+                }
+            } catch (cbErr) {
+                console.error('[OSInterface_BaseXmlHttpGet] callback', callback, 'threw', cbErr);
+            }
+        }).catch(function(err) {
+            var errStr = JSON.stringify({
+                status: err && err.status ? err.status : 0,
+                responseText: err && err.detail ? err.detail : '',
+                checkResult: checkResult,
+                kind: err && err.kind ? err.kind : 'network'
+            });
+            var errCbName = calBackError || callback;
+            try {
+                if (typeof window[errCbName] === 'function') {
+                    window[errCbName](errStr, checkResult, key, callBackSuccess);
+                }
+            } catch (cbErr) {
+                console.error('[OSInterface_BaseXmlHttpGet] error callback', errCbName, 'threw', cbErr);
+            }
+        });
+    }
 }
 
 //public String mMethodUrlHeaders(String urlString, int timeout, String postMessage, String Method, long checkResult, String JsonHeadersArray)
@@ -217,7 +338,25 @@ function OSInterface_BaseXmlHttpGet(
 //Android specific: false
 //Allows to make a http request in a sync function on a url that if called from JS will fail do to CORS error
 function OSInterface_mMethodUrlHeaders(urlString, timeout, postMessage, Method, checkResult, JsonHeadersArray) {
-    return Android.mMethodUrlHeaders(urlString, timeout, postMessage, Method, checkResult, JsonHeadersArray);
+    if (Main_IsOn_OSInterface) {
+        return Android.mMethodUrlHeaders(urlString, timeout, postMessage, Method, checkResult, JsonHeadersArray);
+    } else if (window['Platform'] && window['Platform'].http) {
+        // Can't be synchronous — upstream callers that depend on a sync
+        // return value will get '{}' here. Most uses are for content-type
+        // sniffing and aren't critical for v1 playback.
+        window['Platform'].http.request({
+            url: urlString,
+            method: (Method || 'HEAD').toUpperCase(),
+            body: postMessage || undefined,
+            timeoutMs: timeout || 5000
+        }).then(function(res) {
+            // Fire-and-forget; sync callers don't see the result. Log so we
+            // know if this becomes load-bearing.
+            console.log('[OSInterface_mMethodUrlHeaders] async-fired for', urlString, '(sync return is empty)');
+        }).catch(function() {});
+        return '{}';
+    }
+    return '{}';
 }
 
 //public void mupdatesizePP(boolean FullScreen)
@@ -343,7 +482,17 @@ function OSInterface_StartAuto(uri, mainPlaylistString, who_called, ResumePositi
         mainPlaylistString = Play_FixQualities(mainPlaylistString);
     }
 
-    Android.StartAuto(uri, mainPlaylistString, who_called, ResumePosition, player);
+    if (Main_IsOn_OSInterface) {
+        Android.StartAuto(uri, mainPlaylistString, who_called, ResumePosition, player);
+    } else if (window['Platform'] && window['Platform'].player) {
+        var kindMap = ['live', 'vod', 'clip'];
+        window['Platform'].player.start({
+            uri: uri,
+            manifestString: mainPlaylistString,
+            kind: kindMap[who_called] || 'live',
+            resumePosition: ResumePosition > 0 ? ResumePosition : undefined
+        });
+    }
 }
 
 //public void ReuseFeedPlayer(String uri, String mainPlaylistString, int who_called, long ResumePosition, int player)
@@ -512,7 +661,11 @@ function OSInterface_gettimepreview() {
 //Android specific: false
 //Allows to stop the player when the user chooses to end the playback
 function OSInterface_stopVideo() {
-    Android.stopVideo();
+    if (Main_IsOn_OSInterface) {
+        Android.stopVideo();
+    } else if (window['Platform'] && window['Platform'].player) {
+        window['Platform'].player.stop();
+    }
 }
 
 //public void mClearSmallPlayer()
@@ -527,15 +680,29 @@ function OSInterface_mClearSmallPlayer() {
 //Android specific: false
 //Allows to seek to a position
 function OSInterface_mseekTo(position) {
-    Android.mseekTo(position);
+    if (Main_IsOn_OSInterface) {
+        Android.mseekTo(position);
+    } else if (window['Platform'] && window['Platform'].player) {
+        window['Platform'].player.seek(position);
+    }
 }
 
 //public void PlayPauseChange()
 //Android specific: false
 //Allows to change the playback state, if playing pauses and vice versa
 function OSInterface_PlayPauseChange(PlayVodClip) {
-    if (Main_IsOn_OSInterface) Android.PlayPauseChange();
-    else Play_PlayPauseChange(!ChatLive_Playing, PlayVodClip);
+    if (Main_IsOn_OSInterface) {
+        Android.PlayPauseChange();
+    } else if (window['Platform'] && window['Platform'].player) {
+        var state = window['Platform'].player.getState();
+        if (state === 'playing') {
+            window['Platform'].player.pause();
+        } else {
+            window['Platform'].player.resume();
+        }
+    } else {
+        Play_PlayPauseChange(!ChatLive_Playing, PlayVodClip);
+    }
 }
 
 //public void PlayPause(boolean state)
@@ -543,7 +710,15 @@ function OSInterface_PlayPauseChange(PlayVodClip) {
 //Android specific: false
 //Allows to set the playback state
 function OSInterface_PlayPause(state) {
-    Android.PlayPause(Boolean(state));
+    if (Main_IsOn_OSInterface) {
+        Android.PlayPause(Boolean(state));
+    } else if (window['Platform'] && window['Platform'].player) {
+        if (state) {
+            window['Platform'].player.resume();
+        } else {
+            window['Platform'].player.pause();
+        }
+    }
 }
 
 //public String getversion()
