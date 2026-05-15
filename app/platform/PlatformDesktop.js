@@ -209,11 +209,36 @@
         _videoEl = document.createElement('video');
         _videoEl.id = 'platform-desktop-player';
         _videoEl.setAttribute('playsinline', '');
-        _videoEl.setAttribute('controls', '');  // dev affordance; remove in v1.6 when TV-remote controls land
         _videoEl.muted = true;  // Chrome blocks unmuted autoplay; users unmute via UI
-        _videoEl.style.cssText = 'position:fixed;left:0;top:0;width:100%;height:100%;background:#000;z-index:1;display:block';
+        // No controls=true — upstream's overlay UI is the user-facing player
+        // controls; native browser controls would compete and look wrong.
+        _videoEl.style.cssText = 'position:fixed;left:0;top:0;width:100%;height:100%;background:#000;z-index:0;display:block';
         document.body.appendChild(_videoEl);
         return _videoEl;
+    }
+
+    // Apply a rect to the single <video>. Upstream's positioning calls
+    // (StartScreensPlayer, SetPlayerViewFeedBottom, mupdatesize, etc.)
+    // describe pixel offsets from edges. CSS handles them directly.
+    function _applyRect(v, rect) {
+        if (!rect) return;
+        if (rect.fullscreen === true) {
+            v.style.position = 'fixed';
+            v.style.left = '0';
+            v.style.top = '0';
+            v.style.right = '0';
+            v.style.bottom = '0';
+            v.style.width = '100%';
+            v.style.height = '100%';
+            return;
+        }
+        v.style.position = 'fixed';
+        if (typeof rect.left   === 'number') { v.style.left   = rect.left + 'px';   v.style.width = 'auto'; }
+        if (typeof rect.right  === 'number') { v.style.right  = rect.right + 'px'; }
+        if (typeof rect.top    === 'number') { v.style.top    = rect.top + 'px';    v.style.height = 'auto'; }
+        if (typeof rect.bottom === 'number') { v.style.bottom = rect.bottom + 'px'; }
+        if (typeof rect.height === 'number') { v.style.height = rect.height + 'px'; }
+        if (typeof rect.width  === 'number') { v.style.width  = rect.width + 'px'; }
     }
 
     function _destroyHls() {
@@ -227,6 +252,7 @@
         if (!args || !args.uri) throw new Error('Platform.player.start: args.uri required');
         var v = _ensureVideo();
         v.style.display = 'block';
+        _applyRect(v, args.rect);
         _destroyHls();
 
         if (window.Hls && window.Hls.isSupported()) {
@@ -262,6 +288,15 @@
             _videoEl.load();
             _videoEl.style.display = 'none';
         }
+    };
+
+    // setRect: reposition/resize the same <video> without restarting playback.
+    // Used by upstream's ScreenPlayerRestore / SetPlayerViewSidePanel /
+    // mupdatesize etc. so the SAME stream surface gets moved between
+    // full-screen, side-panel, and feed-tile rects.
+    Platform.player.setRect = function(rect) {
+        if (!_videoEl) return;
+        _applyRect(_videoEl, rect);
     };
 
     Platform.player.pause = function() {
