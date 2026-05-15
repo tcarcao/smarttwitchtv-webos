@@ -213,6 +213,7 @@ function OSInterface_XmlHttpGetFull(
             var bodyStr = typeof res.body === 'string' ? res.body : JSON.stringify(res.body);
             var resultStr = JSON.stringify({
                 status: res.status,
+                url: urlString,             // upstream callers read responseObj.url to set Play_data.AutoUrl
                 responseText: bodyStr,
                 checkResult: checkResult
             });
@@ -226,6 +227,7 @@ function OSInterface_XmlHttpGetFull(
         }).catch(function(err) {
             var errStr = JSON.stringify({
                 status: err && err.status ? err.status : 0,
+                url: urlString,
                 responseText: err && err.detail ? err.detail : '',
                 checkResult: checkResult,
                 kind: err && err.kind ? err.kind : 'network'
@@ -298,6 +300,7 @@ function OSInterface_BaseXmlHttpGet(
             var bodyStr = typeof res.body === 'string' ? res.body : JSON.stringify(res.body);
             var resultStr = JSON.stringify({
                 status: res.status,
+                url: urlString,             // upstream callers read responseObj.url
                 responseText: bodyStr,
                 checkResult: checkResult
             });
@@ -311,6 +314,7 @@ function OSInterface_BaseXmlHttpGet(
         }).catch(function(err) {
             var errStr = JSON.stringify({
                 status: err && err.status ? err.status : 0,
+                url: urlString,
                 responseText: err && err.detail ? err.detail : '',
                 checkResult: checkResult,
                 kind: err && err.kind ? err.kind : 'network'
