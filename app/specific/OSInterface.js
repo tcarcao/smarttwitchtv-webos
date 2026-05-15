@@ -349,7 +349,7 @@ function OSInterface_mMethodUrlHeaders(urlString, timeout, postMessage, Method, 
             method: (Method || 'HEAD').toUpperCase(),
             body: postMessage || undefined,
             timeoutMs: timeout || 5000
-        }).then(function(res) {
+        }).then(function() {
             // Fire-and-forget; sync callers don't see the result. Log so we
             // know if this becomes load-bearing.
             console.log('[OSInterface_mMethodUrlHeaders] async-fired for', urlString, '(sync return is empty)');
