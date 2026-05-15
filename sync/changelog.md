@@ -266,3 +266,35 @@ Adds `UsersPlatform` module with OAuth Implicit grant flow, `/auth-callback.html
 **Slice-order note:** v1.5 ran AFTER v1.6 because public-stream playback (v1.6) doesn't depend on auth. Twitch's `streamPlaybackAccessToken` accepts the public web Client-ID anonymously for public streams. Authenticated features (followed channels, subscribed content) will use the v1.5 token in later slices.
 
 **IPK rebuild:** ✅ `dist-ipk/com.fgl27.smarttwitchtv_0.0.1_all.ipk` (551,114 bytes; includes UsersPlatform).
+
+## 2026-05-15 — Simulated-webOS Chrome MCP validation
+
+Closes the gap where v1.2/v1.3/v1.6.x had only been syntax-checked. Created `app/tests/webos-simulated.html` that stubs `window.webOS` and `window.webOSSystem.deviceInfo` BEFORE the platform scripts load. PlatformDesktop's `if (window['webOS']) return` guard fires (it skips), PlatformWebOS's `if (!window['webOS']) return` guard does not (it runs). The webOS code path now runs in Chrome.
+
+### Validation result
+
+**30/30 PASS** via Chrome DevTools MCP:
+
+- Adapter selection (2): `PlatformWebOSLoaded === true`; `PlatformDesktopLoaded === undefined`. Mutual exclusion proven.
+- device (5): `name()` reads stubbed `webOSSystem.deviceInfo` and returns `'Simulated webOS (Chrome)'`. `manufacturer()` 'LG', `systemVersion()` '4.0.0', `isTV()` true, `appVersion()` '0.0.1'.
+- log (3): info/warn/error wrappers each route to corresponding `console.*` (verified by stub-and-restore probe).
+- storage (4): missing-key null, object round-trip, string round-trip, remove clears.
+- lifecycle.exit (1): calls fake `window.webOS.platformBack()` exactly once (counter increments from N to N+1).
+- input.keyCodes (9): BACK=461, UP=38, DOWN=40, LEFT=37, RIGHT=39, ENTER=13, PLAY=415, PAUSE=19; `registerKeys` is callable as no-op.
+- http.request (1): exists as a function (full network round-trip exercised by other smoke pages).
+- player (5): `getState()` idle before start; `start({uri: Mux})` no-throw; `platform-webos-player` element created in DOM; `platform-desktop-player` does NOT exist (desktop adapter correctly skipped); state reaches `'playing'` on the Mux test stream.
+
+Console: 2 intentional emissions (the smoke's own `Platform.log.warn`/`error` probes) + 2 favicon 404s (cosmetic). Zero adapter errors.
+
+**Screenshot:** `sync/screenshots/v1.2-1.3-1.6.x-webos-simulated.png`.
+
+**What this validates:**
+- v1.2 PlatformWebOS boot adapter — device, log, storage, lifecycle.exit
+- v1.3 PlatformWebOS input.keyCodes
+- v1.6.x PlatformWebOS player port — hls.js + DOM `<video>` end-to-end with Mux test stream
+
+**What this does NOT validate:**
+- Real `usher.ttvnw.net` fetch from webOS (browser dev still needs Vite `/__usher` proxy for Twitch — but PlatformWebOS doesn't apply that rewrite. On a real device, webOS WebKit may or may not enforce CORS the same way; if it does, a webOS Luna service is the follow-up.)
+- Actual webOS-firmware-specific behaviors (codec quirks, key event timing, native autoplay policy) — those only emerge on hardware.
+
+Real-device verification (v1.7 runbook) is still pending — but the code paths themselves are now validated.

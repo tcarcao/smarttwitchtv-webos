@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>PlatformWebOS simulated-in-browser smoke</title>
+    <style>
+        body { font-family: monospace; padding: 1em; max-width: 900px; }
+        .pass { color: #2a7; }
+        .fail { color: #c33; font-weight: bold; }
+        h2 { margin-top: 1.5em; border-bottom: 1px solid #ccc; }
+    </style>
+</head>
+<body>
+<h1>PlatformWebOS (simulated)</h1>
+<p>This page fakes <code>window.webOS</code> BEFORE the platform scripts load so PlatformDesktop no-ops and PlatformWebOS takes over. Validates the webOS adapter code path in Chrome without an actual device.</p>
+<div id="results"></div>
+
+<script>
+// Fake webOS environment — must run before any platform/*.js loads.
+window['webOS'] = {
+    platformBack: function() { window['_fakePlatformBackCalled'] = (window['_fakePlatformBackCalled'] || 0) + 1; }
+};
+window['webOSSystem'] = {
+    deviceInfo: function() {
+        return JSON.stringify({
+            modelName: 'Simulated webOS (Chrome)',
+            modelNumber: 'SIM-CHROMIUM',
+            sdkVersion: '4.0.0',
+            firmwareVersion: '4.0.0-sim'
+        });
+    }
+};
+</script>
+
+<!-- Same script order as index.html -->
+<script src="../thirdparty/hls.min.js"></script>
+<script src="../platform/Platform.js"></script>
+<script src="../platform/PlatformShim.js"></script>
+<script src="../platform/PlatformDesktop.js"></script>
+<script src="../platform/PlatformWebOS.js"></script>
+
+<script>
+(function() {
+    var results = document.getElementById('results');
+    function record(label, ok, detail) {
+        var p = document.createElement('p');
+        p.className = ok ? 'pass' : 'fail';
+        p.textContent = (ok ? 'PASS: ' : 'FAIL: ') + label + (detail ? ' — ' + detail : '');
+        results.appendChild(p);
+    }
+    function section(name) {
+        var h = document.createElement('h2');
+        h.textContent = name;
+        results.appendChild(h);
+    }
+
+    section('Adapter selection');
+    record('PlatformWebOSLoaded === true (webOS adapter ran)', window['PlatformWebOSLoaded'] === true);
+    record('PlatformDesktopLoaded undefined (desktop adapter skipped)', typeof window['PlatformDesktopLoaded'] === 'undefined');
+
+    section('device (v1.2)');
+    record('device.name() reads webOSSystem.deviceInfo.modelName', Platform.device.name() === 'Simulated webOS (Chrome)');
+    record('device.manufacturer() === "LG"', Platform.device.manufacturer() === 'LG');
+    record('device.systemVersion() returns sdkVersion', Platform.device.systemVersion() === '4.0.0');
+    record('device.isTV() === true', Platform.device.isTV() === true);
+    record('device.appVersion() === "0.0.1"', Platform.device.appVersion() === '0.0.1');
+
+    section('log (v1.2)');
+    var logProbed = {info: false, warn: false, error: false};
+    var origI = console.log, origW = console.warn, origE = console.error;
+    console.log = function() { logProbed.info = true; origI.apply(console, arguments); };
+    console.warn = function() { logProbed.warn = true; origW.apply(console, arguments); };
+    console.error = function() { logProbed.error = true; origE.apply(console, arguments); };
+    Platform.log.info('simulated webOS info');
+    Platform.log.warn('simulated webOS warn');
+    Platform.log.error('simulated webOS error');
+    console.log = origI; console.warn = origW; console.error = origE;
+    record('log.info → console.log', logProbed.info === true);
+    record('log.warn → console.warn', logProbed.warn === true);
+    record('log.error → console.error', logProbed.error === true);
+
+    section('storage (v1.2)');
+    var SK = '_sim_storage_key_' + Date.now();
+    record('storage.get missing key returns null', Platform.storage.get(SK) === null);
+    Platform.storage.set(SK, {a: 1, b: 'two'});
+    record('storage round-trips object', JSON.stringify(Platform.storage.get(SK)) === '{"a":1,"b":"two"}');
+    Platform.storage.set(SK, 'plain string');
+    record('storage round-trips string', Platform.storage.get(SK) === 'plain string');
+    Platform.storage.remove(SK);
+    record('storage.remove clears key', Platform.storage.get(SK) === null);
+
+    section('lifecycle.exit (v1.2)');
+    var backBefore = window['_fakePlatformBackCalled'] || 0;
+    Platform.lifecycle.exit();
+    var backAfter = window['_fakePlatformBackCalled'] || 0;
+    record('lifecycle.exit calls window.webOS.platformBack()', backAfter === backBefore + 1);
+
+    section('input.keyCodes (v1.3)');
+    record('keyCodes.BACK === 461 (webOS back)', Platform.input.keyCodes.BACK === 461);
+    record('keyCodes.UP === 38', Platform.input.keyCodes.UP === 38);
+    record('keyCodes.DOWN === 40', Platform.input.keyCodes.DOWN === 40);
+    record('keyCodes.LEFT === 37', Platform.input.keyCodes.LEFT === 37);
+    record('keyCodes.RIGHT === 39', Platform.input.keyCodes.RIGHT === 39);
+    record('keyCodes.ENTER === 13', Platform.input.keyCodes.ENTER === 13);
+    record('keyCodes.PLAY === 415 (webOS media)', Platform.input.keyCodes.PLAY === 415);
+    record('keyCodes.PAUSE === 19 (webOS media)', Platform.input.keyCodes.PAUSE === 19);
+    var registerKeysOk = false;
+    try { Platform.input.registerKeys(); registerKeysOk = true; } catch (e) {}
+    record('input.registerKeys is callable (no-op)', registerKeysOk);
+
+    section('http.request (v1.4)');
+    record('Platform.http.request is a function', typeof Platform.http.request === 'function');
+
+    section('player (v1.6.x port)');
+    var MUX = 'https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8';
+    record('player.getState() === "idle" before start', Platform.player.getState() === 'idle');
+
+    var startError = null;
+    try {
+        Platform.player.start({uri: MUX, kind: 'live', rect: {fullscreen: false}});
+    } catch (e) { startError = e; }
+    record('player.start did not throw', startError === null, startError && startError.message);
+
+    // Verify the WebOS video element id (NOT the desktop one)
+    setTimeout(function() {
+        var vWebOS = document.getElementById('platform-webos-player');
+        var vDesktop = document.getElementById('platform-desktop-player');
+        record('platform-webos-player element exists (webOS adapter created it)', vWebOS !== null);
+        record('platform-desktop-player element does NOT exist (desktop skipped)', vDesktop === null);
+    }, 100);
+
+    // Poll for playback
+    var pollMs = 0;
+    var poll = setInterval(function() {
+        pollMs += 250;
+        var s = Platform.player.getState();
+        if (s === 'playing') {
+            clearInterval(poll);
+            record('player reached state="playing" via PlatformWebOS', true, 'after ' + pollMs + 'ms');
+            // Compose the global result indicator AFTER the playing assertion
+            // (and any pending pass/fail rows) commit.
+            setTimeout(function() {
+                var rows = Array.from(document.querySelectorAll('#results p'));
+                var fails = rows.filter(function(r) { return r.className === 'fail'; });
+                window['SIM_SMOKE_RESULT'] = {
+                    ok: fails.length === 0,
+                    total: rows.length,
+                    pass: rows.length - fails.length,
+                    fail: fails.length,
+                    failures: fails.map(function(r) { return r.textContent; })
+                };
+            }, 200);
+        } else if (pollMs >= 10000) {
+            clearInterval(poll);
+            record('player reached state="playing" via PlatformWebOS', false, 'last state: ' + s);
+            window['SIM_SMOKE_RESULT'] = {ok: false, error: 'player timeout', lastState: s};
+        }
+    }, 250);
+})();
+</script>
+</body>
+</html>
