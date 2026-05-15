@@ -107,17 +107,39 @@
             url = url.replace('https://usher.ttvnw.net', '/__usher');
         } else if (/^https:\/\/(?:[^/]+\.)?(?:twitch\.tv|ttvnw\.net|jtvnw\.net)\//.test(url)) {
             // Universal proxy for other Twitch endpoints (gql, helix, etc.).
-            // Even if they're already CORS-friendly, going through the proxy
-            // is harmless and gives us a single chokepoint to debug.
-            url = '/__proxy?url=' + encodeURIComponent(url);
+            // The middleware doesn't forward arbitrary client headers; we
+            // encode them in the ?headers= b64-JSON param so Client-ID /
+            // Authorization survive the round-trip.
+            var hObj = {};
+            if (args.headers && args.headers.length) {
+                for (var hi = 0; hi < args.headers.length; hi++) {
+                    hObj[args.headers[hi][0]] = args.headers[hi][1];
+                }
+            }
+            var hB64 = '';
+            try {
+                // btoa expects a binary string; UTF-8 encode first.
+                hB64 = btoa(unescape(encodeURIComponent(JSON.stringify(hObj))));
+            } catch (e) {
+                hB64 = '';
+            }
+            url = '/__proxy?url=' + encodeURIComponent(url) + (hB64 ? '&headers=' + encodeURIComponent(hB64) : '');
         }
         var timeoutMs = typeof args.timeoutMs === 'number' ? args.timeoutMs : 8000;
         var validate = typeof args.validate === 'function' ? args.validate : null;
 
         var headers = {};
+        // If we routed to /__proxy above, headers are already encoded in the
+        // URL via ?headers= — don't re-send them as request headers (the
+        // middleware ignores them anyway). But Content-Type for the POST
+        // body still needs to be a real header so fetch sets it.
+        var routedToProxy = url.indexOf('/__proxy?') === 0;
         if (args.headers && args.headers.length) {
             for (var i = 0; i < args.headers.length; i++) {
-                headers[args.headers[i][0]] = args.headers[i][1];
+                var k = args.headers[i][0];
+                var v = args.headers[i][1];
+                if (routedToProxy && k.toLowerCase() !== 'content-type') continue;
+                headers[k] = v;
             }
         }
 

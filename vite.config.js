@@ -36,7 +36,7 @@ export default defineConfig({
         {
             name: 'universal-cors-proxy',
             configureServer(server) {
-                server.middlewares.use('/__proxy', async (req, res, next) => {
+                server.middlewares.use('/__proxy', async (req, res) => {
                     // Parse target URL from query string.
                     const u = new URL(req.url, 'http://localhost');
                     const target = u.searchParams.get('url');
