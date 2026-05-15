@@ -298,3 +298,50 @@ Console: 2 intentional emissions (the smoke's own `Platform.log.warn`/`error` pr
 - Actual webOS-firmware-specific behaviors (codec quirks, key event timing, native autoplay policy) — those only emerge on hardware.
 
 Real-device verification (v1.7 runbook) is still pending — but the code paths themselves are now validated.
+
+## 2026-05-15 — Upstream Play.js refactor: real app now plays via Platform
+
+User correctly called out that all prior validation was on standalone test pages (`twitch-watch.html`, `twitch-top.html`), not the actual app UI. Loading the real app showed it was using Twitch's embed iframe (`<iframe src="https://embed.twitch.tv/...">`) — none of our Platform code was on the playback path. Fixed.
+
+### What was wrong
+
+Upstream's seeded `Play.js` has a `Main_IsOn_OSInterface` branch that, when running in browser mode, takes a completely different path than Android:
+- `Play_loadData` → `Play_loadDataSuccessFake` (synthesizes 6 fake quality entries, never fetches a real manifest)
+- `Play_qualityChanged` → `Play_onPlayer` (only runs on Android — no-op in browser)
+- A separate `BrowserTestStartLive` creates Twitch's official embed iframe
+
+None of that runs through our Platform.player. The smoke pages worked because they bypassed Play.js entirely and called `PlayHLSPlatform.playLiveChannel()` directly.
+
+### Refactor (commits 9391203, 2aacbf1, c3d2cd9, 97dcc95, …, 2 player-flow follow-ups)
+
+Three layers of change:
+
+1. **Universal CORS proxy** (`9391203` + `2aacbf1`): Vite-server middleware `/__proxy?url=ENCODED[&headers=B64_JSON]` that fetches any Twitch URL server-side with `Origin: https://www.twitch.tv` headers. Eliminates browser CORS as a class for any Twitch endpoint during dev. PlatformDesktop.http rewrites any `*.twitch.tv` / `*.ttvnw.net` / `*.jtvnw.net` URL through the proxy with headers b64-encoded. Existing `/__usher` path-form proxy stays for hls.js's internal segment fetches.
+
+2. **OSInterface bridge to Platform** (`97dcc95` + `c3d2cd9`): patched ~10 OSInterface_* functions with a third branch: when `!Main_IsOn_OSInterface && window.Platform.X` exists, route to Platform.X. The load-bearing function is `OSInterface_XmlHttpGetFull` — bridges upstream's eval-by-name callback pattern to `Platform.http.request`'s Promise pattern. Response shape includes the original `url` field so upstream callers populate `Play_data.AutoUrl` correctly. `OSInterface_StartAuto` kindMap fixed to handle 1/2/3 = live/vod/clip (the values upstream callers actually pass).
+
+3. **Play.js routing** (follow-ups): `Play_loadData` checks `window.Platform.http` and takes the real HLS chain (PlayHLS_GetPlayListAsync → token GQL → usher manifest) instead of the fake-qualities fallback. `Play_onPlayer` adds a Platform branch parallel to the Android branch. `BrowserTestStartLive` iframe path gated on `!_platformActive` so it doesn't race with our Platform path.
+
+### Verification — actual app in Chrome via MCP
+
+Navigated to `http://localhost:5173/` (the real app, NOT a test page). After app boot and stream selection:
+
+- `Play_data.AutoUrl`: `https://usher.ttvnw.net/api/channel/hls/stableronaldo.m3u8?token=%7B%22adblock...` (real signed Twitch URL)
+- `Play_data.playlist`: `#EXTM3U\n#EXT-X-TWITCH-INFO:NODE="7325bab210ad.j.cloudfront..."` (real Twitch HLS manifest)
+- `document.getElementById('platform-desktop-player')` exists in DOM
+- `Platform.player.getState()` → `'playing'`
+- video: `currentTime` 72s, `videoWidth` 1920, `videoHeight` 1080, `paused` false, `readyState` 4
+- **iframe count: 0** (no Twitch embed)
+
+Screenshot: `sync/screenshots/post-refactor-real-stream-playing.png` — stableronaldo's stream rendering in our `<video>` element (1920×1080), chat overlay on top from upstream's WSS path (still working since chat uses WSS directly, not the bridge).
+
+Console: 1 boot-time `[PlatformShim] Android.setAppIds not mapped` (Firebase analytics setup, harmless), 1 unrelated 401 (OAuth validate, not in our flow), 1 WSS warn (chat connecting). Zero Platform errors.
+
+**The user's stated goal is met:** "click to open a stream … should be using our implementation using HLS." Real Twitch stream playing through our Platform.http + Platform.player in the actual app UI, no Twitch iframe.
+
+### Still open
+
+- **Hover preview** still uses `Android.ReuseFeedPlayer` / `Android.StartFeedPlayer` — multi-player surface. `Platform.multiPlayer` is still `null`. Either implement that (hls.js can run multiple instances) or hide the preview UI when `Platform.capabilities.multiPlayer === null`.
+- **Chat** uses upstream's WSS path; appears to work but a console warning suggests the connection drops once. Worth investigating if it's reliable.
+- **Settings UI** items related to Android-specific features (notifications, multi-stream, codec blacklist) — still unmapped Android calls. Cosmetic for now.
+- **webOS** still pending device verification, but the same OSInterface bridge code runs there too once a device is online.
