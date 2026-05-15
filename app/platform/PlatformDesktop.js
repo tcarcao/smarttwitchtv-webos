@@ -46,10 +46,11 @@
         return false;
     };
     Platform.device.appVersion = function() {
-        // High version so upstream's "APK Update available" check (which
-        // compares against a published latest version) treats us as current.
+        // High version on all three components — upstream's Main_needUpdate
+        // checks parseFloat(major.minor) < VersionBase OR parseInt(patch) <
+        // publishVersionCode (currently 379). 999.99.99999 satisfies both.
         // Our actual fork version is tracked in package.json + git.
-        return '999.99.99';
+        return '999.99.99999';
     };
 
     // -- log --
