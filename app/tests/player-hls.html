@@ -134,6 +134,39 @@
         }, 100);
     });
 
+    // ---- Task 3: Twitch-tuned config, latency modes, speed adjustment ----
+    tests.push(function testTwitchConfig(done) {
+        var h = startCachedPlayer();
+        var c = h && h.config;
+        record('config: abrEwmaDefaultEstimate 6 Mbps', !!c && c.abrEwmaDefaultEstimate === 6000000, c && ('got ' + c.abrEwmaDefaultEstimate));
+        record('config: testBandwidth disabled', !!c && c.testBandwidth === false);
+        record('config: startFragPrefetch enabled', !!c && c.startFragPrefetch === true);
+        record('config: default latency mode 1 → liveSyncDuration 2.5', !!c && c.liveSyncDuration === 2.5, c && ('got ' + c.liveSyncDuration));
+        Platform.player.setLatencyMode(0);
+        record('latency 0 (disabled) → liveSyncDuration 6', !!c && c.liveSyncDuration === 6, c && ('got ' + c.liveSyncDuration));
+        Platform.player.setLatencyMode(2);
+        record('latency 2 (lowest) → liveSyncDuration 1.5', !!c && c.liveSyncDuration === 1.5, c && ('got ' + c.liveSyncDuration));
+        Platform.player.setLatencyMode(1);
+        record('latency 1 (normal) → liveSyncDuration 2.5', !!c && c.liveSyncDuration === 2.5, c && ('got ' + c.liveSyncDuration));
+        record('latency: liveMaxLatencyDuration > liveSyncDuration', !!c && c.liveMaxLatencyDuration > c.liveSyncDuration);
+        var hasSpeedApi = typeof Platform.player.setSpeedAdjustment === 'function';
+        record('speedAdjustment: Platform.player.setSpeedAdjustment exists', hasSpeedApi);
+        if (hasSpeedApi) {
+            Platform.player.setSpeedAdjustment(true);
+            record('speedAdjustment on → maxLiveSyncPlaybackRate 1.08', !!c && c.maxLiveSyncPlaybackRate === 1.08, c && ('got ' + c.maxLiveSyncPlaybackRate));
+            Platform.player.setSpeedAdjustment(false);
+            record('speedAdjustment off → maxLiveSyncPlaybackRate 1', !!c && c.maxLiveSyncPlaybackRate === 1, c && ('got ' + c.maxLiveSyncPlaybackRate));
+        }
+        record('shim: Android.setSpeedAdjustment forwards to player', (function() {
+            if (!hasSpeedApi || !window.Android) return false;
+            window.Android.setSpeedAdjustment(true);
+            var on = c && c.maxLiveSyncPlaybackRate === 1.08;
+            window.Android.setSpeedAdjustment(false);
+            return on;
+        })());
+        done();
+    });
+
     runNext();
 })();
 </script>

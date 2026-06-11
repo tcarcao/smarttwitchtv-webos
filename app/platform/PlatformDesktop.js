@@ -453,6 +453,46 @@
         return _ProxyLoader;
     }
 
+    // Upstream OSInterface_mSetlatency values (en_US.js STR_LOWLATENCY_
+    // ENABLE_ARRAY): 0 = Disabled, 1 = Normal mode, 2 = Lowest mode.
+    var _latencyMode = 1;
+    // Upstream setSpeedAdjustment: chase the live edge by playing
+    // slightly fast while behind the target latency.
+    var _speedAdjust = false;
+
+    function _liveSyncFor(mode) {
+        // Twitch live segments are 2 s. Disabled = conventional
+        // 3-segment distance; Lowest hugs the edge hard (more rebuffer
+        // risk, upstream warns the user the same way).
+        if (mode === 0) return {sync: 6,   max: 14};
+        if (mode === 2) return {sync: 1.5, max: 6};
+        return {sync: 2.5, max: 8};
+    }
+
+    function _buildHlsConfig() {
+        var live = _liveSyncFor(_latencyMode);
+        return {
+            // ABR opens at ~6 Mbps so the first fragment request targets
+            // the 1080p60 source rendition instead of ramping up from the
+            // lowest. Twitch source tops out around 6-8 Mbps. Mirrors
+            // upstream's raised DEFAULT_INITIAL_BITRATE_ESTIMATES_WIFI
+            // media3 patch (apk/Media3 changes.md).
+            abrEwmaDefaultEstimate: 6000000,
+            testBandwidth: false,
+            // Fetch the first fragment while MSE buffers are still being
+            // set up (analog of upstream's 100 ms bufferForPlayback +
+            // chunkless preparation: shave the startup round trips).
+            startFragPrefetch: true,
+            // Twitch splices ads with #EXT-X-DISCONTINUITY; jump small
+            // buffer holes at splice points instead of stalling.
+            maxBufferHole: 1,
+            nudgeMaxRetry: 5,
+            liveSyncDuration: live.sync,
+            liveMaxLatencyDuration: live.max,
+            maxLiveSyncPlaybackRate: _speedAdjust ? 1.08 : 1
+        };
+    }
+
     // Serves the multivariant playlist that the app JS already fetched
     // (passed through StartAuto as manifestString) instead of letting
     // hls.js re-fetch the usher URL. Mirrors upstream Android's forked
@@ -557,7 +597,7 @@
             }
             var ProxyLoader = _getProxyLoader();
             var BaseLoader = ProxyLoader || window.Hls.DefaultConfig.loader;
-            var hlsConfig = {};
+            var hlsConfig = _buildHlsConfig();
             if (args.manifestString && args.manifestString.indexOf('#EXTM3U') === 0) {
                 hlsConfig.loader = _makeCachedManifestLoader(BaseLoader, args.manifestString);
             } else if (ProxyLoader) {
@@ -708,20 +748,22 @@
         _hls.autoLevelCapping = bestIdx;
     };
 
-    // mSetlatency receives the value from upstream's low_latency_array
-    // [0, 2, 1]: 0=low, 1=medium, 2=normal. Map to hls.js's
-    // liveSyncDuration (target lag from live edge) and
-    // liveMaxLatencyDuration (catch-up hard cap). Twitch generally serves
-    // 2-6s segments; values below ~1.5s force aggressive seek-to-live
-    // and risk stalls on a flaky link.
     Platform.player.setLatencyMode = function(mode) {
-        if (!_hls || !_hls.config) return;
-        var liveSync, liveMax;
-        if (mode === 0)      { liveSync = 1.5; liveMax = 4;  }   // low
-        else if (mode === 1) { liveSync = 2.5; liveMax = 6;  }   // medium
-        else                 { liveSync = 5;   liveMax = 10; }   // normal
-        _hls.config.liveSyncDuration = liveSync;
-        _hls.config.liveMaxLatencyDuration = liveMax;
+        _latencyMode = mode === 0 || mode === 2 ? mode : 1;
+        if (_hls && _hls.config) {
+            var live = _liveSyncFor(_latencyMode);
+            // hls.js reads these continuously; mutating live config is
+            // the supported way to retune latency without a restart.
+            _hls.config.liveSyncDuration = live.sync;
+            _hls.config.liveMaxLatencyDuration = live.max;
+        }
+    };
+
+    Platform.player.setSpeedAdjustment = function(enabled) {
+        _speedAdjust = !!enabled;
+        if (_hls && _hls.config) {
+            _hls.config.maxLiveSyncPlaybackRate = _speedAdjust ? 1.08 : 1;
+        }
     };
 
     // Minimal event subscription. Maps a few hls.js / <video> events into

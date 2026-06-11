@@ -679,8 +679,8 @@
         // explicitly to stop the boot-time "unmapped" warnings — the no-op
         // is the correct mapping, not a placeholder.
         //
-        // setSpeedAdjustment: meta-flag for native low-latency speed-up
-        //   logic; the actual rate change lives in setPlaybackSpeed (mapped).
+        // setSpeedAdjustment: maps upstream's media3 speed-up flag onto
+        // hls.js maxLiveSyncPlaybackRate (live-edge chasing).
         // SetMainPlayerBitrate / mSetlatency: hls.js ABR handles this in JS;
         //   we'd need hls.config tuning to honour these, deferred.
         // UpdateBlockedChannels / UpdateBlockedGames: the JS-side filter
@@ -691,7 +691,9 @@
         // mCheckRefreshToast: token-refresh result toast — no native
         //   refresh service to drive it.
         // setAppToken: notification-service auth token.
-        setSpeedAdjustment:    function(/* enabled */) {},
+        setSpeedAdjustment:    function(enabled) {
+            if (Platform.player.setSpeedAdjustment) Platform.player.setSpeedAdjustment(enabled);
+        },
         SetMainPlayerBitrate:  function(bitrate, resolution) {
             if (Platform.player.setMaxBitrate) Platform.player.setMaxBitrate(bitrate || 0, resolution || 0);
         },
