@@ -462,6 +462,52 @@
     // slightly fast while behind the target latency.
     var _speedAdjust = false;
 
+    var _mediaRecoverAt = 0;
+    var _netRecoverCount = 0;
+
+    // _eventHandlers is declared further down (function-scoped var,
+    // hoisted; assigned at module load — safe to reference here).
+    function _emitPlayerEvent(event, payload) {
+        var hs = _eventHandlers[event] || [];
+        for (var i = 0; i < hs.length; i++) {
+            try { hs[i](payload); } catch (e) { /* a listener error must not break playback */ }
+        }
+    }
+
+    function _wireHlsErrorHandling() {
+        var h = _hls;
+        h.on(window.Hls.Events.ERROR, function(event, data) {
+            if (!data || !data.fatal || _hls !== h) return;
+            var H = window.Hls;
+            if (data.type === H.ErrorTypes.MEDIA_ERROR) {
+                // One recovery attempt per 10 s window — mirrors
+                // upstream's single ExoPlayer retry before surfacing.
+                var now = Date.now();
+                if (now - _mediaRecoverAt > 10000) {
+                    _mediaRecoverAt = now;
+                    h.recoverMediaError();
+                    return;
+                }
+            } else if (data.type === H.ErrorTypes.NETWORK_ERROR) {
+                // Twitch 404s the playlist when the stream ends and 403s
+                // sub-only content — surface those so the app runs its
+                // offline path; retry everything else twice.
+                var code = data.response && data.response.code;
+                var surface = code === 404 || code === 403;
+                if (!surface && _netRecoverCount < 2) {
+                    _netRecoverCount++;
+                    h.startLoad();
+                    return;
+                }
+            }
+            _emitPlayerEvent('error', {
+                kind: data.type === H.ErrorTypes.MEDIA_ERROR ? 'media' : 'network',
+                recoverable: false,
+                detail: data.details
+            });
+        });
+    }
+
     function _liveSyncFor(mode) {
         // Twitch live segments are 2 s. Disabled = conventional
         // 3-segment distance; Lowest hugs the edge hard (more rebuffer
@@ -610,6 +656,9 @@
                 hlsConfig.loader = _makeCachedManifestLoader(BaseLoader, args.manifestString);
             }
             _hls = new window.Hls(hlsConfig);
+            _mediaRecoverAt = 0;
+            _netRecoverCount = 0;
+            _wireHlsErrorHandling();
             _hls.loadSource(startUri);
             _hls.attachMedia(v);
             _hls.on(window.Hls.Events.MANIFEST_PARSED, function() {

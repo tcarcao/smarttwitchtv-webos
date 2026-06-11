@@ -231,6 +231,38 @@
         done();
     });
 
+    // ---- Task 6: error recovery + offline surfacing ----
+    tests.push(function testErrorRecovery(done) {
+        var h = startCachedPlayer();
+        if (!h) { record('error recovery: hls instance', false); done(); return; }
+        var H = window.Hls;
+        var recovered = 0, retried = 0, emitted = [];
+        h.recoverMediaError = function() { recovered++; };
+        h.startLoad = function() { retried++; };
+        Platform.player.on('error', function(e) { emitted.push(e); });
+
+        h.trigger(H.Events.ERROR, {type: H.ErrorTypes.MEDIA_ERROR, details: 'bufferAppendError', fatal: true});
+        record('fatal media error → recoverMediaError() once, not surfaced', recovered === 1 && emitted.length === 0,
+            'recovered=' + recovered + ' emitted=' + emitted.length);
+
+        h.trigger(H.Events.ERROR, {type: H.ErrorTypes.MEDIA_ERROR, details: 'bufferAppendError', fatal: true});
+        record('repeat media error within window → surfaced as media error',
+            emitted.length === 1 && emitted[0].kind === 'media', JSON.stringify(emitted));
+
+        emitted.length = 0;
+        h.trigger(H.Events.ERROR, {type: H.ErrorTypes.NETWORK_ERROR, details: 'levelLoadError', fatal: true, response: {code: 404}});
+        record('fatal 404 (stream offline) → surfaced immediately, no retry',
+            retried === 0 && emitted.length === 1 && emitted[0].kind === 'network',
+            'retried=' + retried + ' emitted=' + JSON.stringify(emitted));
+
+        emitted.length = 0;
+        h.trigger(H.Events.ERROR, {type: H.ErrorTypes.NETWORK_ERROR, details: 'fragLoadError', fatal: true, response: {code: 0}});
+        record('fatal transient network error → startLoad() retry, not surfaced',
+            retried === 1 && emitted.length === 0, 'retried=' + retried + ' emitted=' + emitted.length);
+
+        done();
+    });
+
     runNext();
 })();
 </script>
