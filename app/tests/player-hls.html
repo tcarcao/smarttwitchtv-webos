@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Player HLS — Twitch optimizations</title>
+    <style>
+        body { font-family: monospace; padding: 1em; }
+        .pass { color: #2a7; }
+        .fail { color: #c33; font-weight: bold; }
+    </style>
+</head>
+<body>
+<h1>Player HLS — Twitch optimizations</h1>
+<div id="results"></div>
+<div id="done" style="display:none">DONE</div>
+<script src="../thirdparty/hls.min.js"></script>
+<script src="../platform/Platform.js"></script>
+<script src="../platform/PlatformDesktop.js"></script>
+<script src="../platform/PlatformShim.js"></script>
+<script src="../specific/PlayHLSPlatform.js"></script>
+<script>
+(function() {
+    'use strict';
+    var results = document.getElementById('results');
+    function record(label, ok, detail) {
+        var p = document.createElement('p');
+        p.className = ok ? 'pass' : 'fail';
+        p.textContent = (ok ? 'PASS: ' : 'FAIL: ') + label + (detail ? ' — ' + detail : '');
+        results.appendChild(p);
+    }
+
+    // Record every XHR URL so tests can assert what was (not) fetched.
+    var xhrLog = [];
+    var origOpen = XMLHttpRequest.prototype.open;
+    XMLHttpRequest.prototype.open = function(method, url) {
+        xhrLog.push(String(url));
+        return origOpen.apply(this, arguments);
+    };
+
+    // Fake hosts deliberately do NOT match the platform ProxyLoader regex
+    // (cloudfront/ttvnw/...), so requests go through the default XhrLoader
+    // and show up in xhrLog. Variant URLs are absolute, like real usher
+    // playlists.
+    var FAKE_MASTER_URI = 'https://fake-usher.example.com/api/channel/hls/test.m3u8';
+    var MANIFEST =
+        '#EXTM3U\n' +
+        '#EXT-X-STREAM-INF:BANDWIDTH=6000000,RESOLUTION=1920x1080,CODECS="avc1.640028,mp4a.40.2",FRAME-RATE=60.000,VIDEO="chunked"\n' +
+        'https://fake-edge.example.com/v1/playlist/chunked.m3u8\n' +
+        '#EXT-X-STREAM-INF:BANDWIDTH=3000000,RESOLUTION=1280x720,CODECS="avc1.4d401f,mp4a.40.2",FRAME-RATE=60.000,VIDEO="720p60"\n' +
+        'https://fake-edge.example.com/v1/playlist/720p60.m3u8\n';
+
+    function startCachedPlayer() {
+        Platform.player.start({
+            uri: FAKE_MASTER_URI,
+            manifestString: MANIFEST,
+            kind: 'live',
+            rect: {fullscreen: true}
+        });
+        return Platform.player.getHlsInstance ? Platform.player.getHlsInstance() : null;
+    }
+
+    var tests = [];
+    function runNext() {
+        var t = tests.shift();
+        if (!t) {
+            document.getElementById('done').style.display = 'block';
+            return;
+        }
+        var finished = false;
+        function done() {
+            if (finished) return;
+            finished = true;
+            try { Platform.player.stop(); } catch (e) { /* ignore */ }
+            setTimeout(runNext, 50);
+        }
+        try {
+            t(done);
+        } catch (e) {
+            record(t.name + ' (threw)', false, String(e));
+            done();
+        }
+    }
+
+    // ---- Task 1/2: cached manifest served to hls.js, no master refetch ----
+    tests.push(function testCachedManifest(done) {
+        xhrLog.length = 0;
+        var h = startCachedPlayer();
+        if (!h) {
+            record('cached manifest: Platform.player.getHlsInstance() exposed', false, 'missing');
+            done();
+            return;
+        }
+        var parsed = false;
+        h.on(window.Hls.Events.MANIFEST_PARSED, function() { parsed = true; });
+        setTimeout(function() {
+            var masterFetched = xhrLog.some(function(u) { return u.indexOf('fake-usher.example.com') !== -1; });
+            record('cached manifest: master playlist NOT fetched over network', !masterFetched, 'xhr: ' + xhrLog.join(', '));
+            record('cached manifest: MANIFEST_PARSED fired from cached string', parsed);
+            record('cached manifest: 2 levels parsed', !!(h.levels && h.levels.length === 2), 'levels=' + (h.levels && h.levels.length));
+            done();
+        }, 2000);
+    });
+
+    runNext();
+})();
+</script>
+</body>
+</html>
