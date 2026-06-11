@@ -148,7 +148,8 @@
         record('latency 2 (lowest) → liveSyncDuration 1.5', !!c && c.liveSyncDuration === 1.5, c && ('got ' + c.liveSyncDuration));
         Platform.player.setLatencyMode(1);
         record('latency 1 (normal) → liveSyncDuration 2.5', !!c && c.liveSyncDuration === 2.5, c && ('got ' + c.liveSyncDuration));
-        record('latency: liveMaxLatencyDuration > liveSyncDuration', !!c && c.liveMaxLatencyDuration > c.liveSyncDuration);
+        record('latency: liveMaxLatencyDuration left unset (no forced live-edge seeks; webOS swallows MSE seeks)', !!c && c.liveMaxLatencyDuration === undefined, c && ('got ' + c.liveMaxLatencyDuration));
+        record('config: backBufferLength capped at 10 (webOS append jank grows with SourceBuffer size)', !!c && c.backBufferLength === 10, c && ('got ' + c.backBufferLength));
         var hasSpeedApi = typeof Platform.player.setSpeedAdjustment === 'function';
         record('speedAdjustment: Platform.player.setSpeedAdjustment exists', hasSpeedApi);
         if (hasSpeedApi) {

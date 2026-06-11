@@ -510,13 +510,12 @@
         // Twitch live segments are 2 s. Disabled = conventional
         // 3-segment distance; Lowest hugs the edge hard (more rebuffer
         // risk, upstream warns the user the same way).
-        if (mode === 0) return {sync: 6,   max: 14};
-        if (mode === 2) return {sync: 1.5, max: 6};
-        return {sync: 2.5, max: 8};
+        if (mode === 0) return 6;
+        if (mode === 2) return 1.5;
+        return 2.5;
     }
 
     function _buildHlsConfig() {
-        var live = _liveSyncFor(_latencyMode);
         return {
             // ABR opens at ~6 Mbps so the first fragment request targets
             // the 1080p60 source rendition instead of ramping up from the
@@ -533,8 +532,18 @@
             // buffer holes at splice points instead of stalling.
             maxBufferHole: 1,
             nudgeMaxRetry: 5,
-            liveSyncDuration: live.sync,
-            liveMaxLatencyDuration: live.max,
+            // liveSyncDuration is a TARGET (start position + rate-chase
+            // goal), enforced only via maxLiveSyncPlaybackRate when speed
+            // adjustment is on. liveMaxLatencyDuration is deliberately
+            // NOT set: when exceeded it makes hls.js force-seek toward
+            // the edge, and webOS swallows MSE seeks (verified on a real
+            // TV, 2026-06-11) — the controller then seek-storms. Stock
+            // hls.js also leaves it unset (count default = Infinity).
+            liveSyncDuration: _liveSyncFor(_latencyMode),
+            // webOS MSE appends get expensive as the SourceBuffer grows
+            // (79 s of 1080p60 back-buffer measured ≈ 60 MB → per-append
+            // jank); keep a short tail. Value live-tested on the TV.
+            backBufferLength: 10,
             maxLiveSyncPlaybackRate: _speedAdjust ? 1.08 : 1
         };
     }
@@ -805,11 +814,9 @@
     Platform.player.setLatencyMode = function(mode) {
         _latencyMode = mode === 0 || mode === 2 ? mode : 1;
         if (_hls && _hls.config) {
-            var live = _liveSyncFor(_latencyMode);
-            // hls.js reads these continuously; mutating live config is
+            // hls.js reads this continuously; mutating live config is
             // the supported way to retune latency without a restart.
-            _hls.config.liveSyncDuration = live.sync;
-            _hls.config.liveMaxLatencyDuration = live.max;
+            _hls.config.liveSyncDuration = _liveSyncFor(_latencyMode);
         }
     };
 
