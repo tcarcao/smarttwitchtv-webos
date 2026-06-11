@@ -37,6 +37,18 @@ export default defineConfig({
             name: 'universal-cors-proxy',
             configureServer(server) {
                 server.middlewares.use('/__proxy', async (req, res) => {
+                    // CORS preflight: cross-origin browser requests from other
+                    // dev servers (e.g., LG app on 8081 hitting our 5173 proxy)
+                    // will OPTIONS-preflight when sending non-simple headers.
+                    if (req.method === 'OPTIONS') {
+                        res.statusCode = 204;
+                        res.setHeader('access-control-allow-origin', '*');
+                        res.setHeader('access-control-allow-methods', 'GET, POST, PUT, PATCH, DELETE, OPTIONS');
+                        res.setHeader('access-control-allow-headers', '*');
+                        res.setHeader('access-control-max-age', '86400');
+                        res.end();
+                        return;
+                    }
                     // Parse target URL from query string.
                     const u = new URL(req.url, 'http://localhost');
                     const target = u.searchParams.get('url');
@@ -69,13 +81,25 @@ export default defineConfig({
                     }
 
                     // Build the upstream request headers: spoof Origin/Referer to Twitch,
-                    // copy Content-Type from the incoming request, layer extraHeaders on top.
+                    // forward known Twitch-API headers from the request (Client-ID,
+                    // Authorization, Content-Type, X-Device-Id), layer ?headers= on top.
+                    // User-Agent: hardcode to a webOS TV string so Twitch's ad system
+                    // fingerprints us as a TV app (lighter ad treatment) rather than
+                    // a desktop browser. Matches what the real LG TV WebView sends.
                     const upstreamHeaders = {
                         'Origin': 'https://www.twitch.tv',
                         'Referer': 'https://www.twitch.tv/',
-                        'User-Agent': req.headers['user-agent'] || 'Mozilla/5.0'
+                        'User-Agent': 'Mozilla/5.0 (Web0S; Linux/SmartTV) AppleWebKit/605.1.15 (KHTML, like Gecko) Chrome/108.0.5359.215 Safari/605.1.15 WebAppManager'
                     };
-                    if (req.headers['content-type']) upstreamHeaders['Content-Type'] = req.headers['content-type'];
+                    const forwardable = ['content-type', 'client-id', 'authorization', 'x-device-id', 'accept'];
+                    for (const h of forwardable) {
+                        if (req.headers[h]) {
+                            // Convert lower-case header name back to a conventional case;
+                            // fetch() normalises but some upstreams are picky.
+                            const canon = h.split('-').map(s => s.charAt(0).toUpperCase() + s.slice(1)).join('-');
+                            upstreamHeaders[canon] = req.headers[h];
+                        }
+                    }
                     Object.assign(upstreamHeaders, extraHeaders);
 
                     try {

@@ -11,6 +11,12 @@
     "uiRevision": "2",
     "appDescription": "Twitch client for LG webOS",
     "disableBackHistoryAPI": true,
+    "resolution": "1920x1080",
+    "requiredPermissions": [
+        "time.query",
+        "activity.operation",
+        "audio.operation"
+    ],
     "supportTouchMode": "none",
     "transparent": false
 }

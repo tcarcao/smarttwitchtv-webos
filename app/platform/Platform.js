@@ -55,7 +55,12 @@
             nativeNotifications: false,
             deepLinks: true,
             hardwareHLS: false,
-            surfaceBehindWebView: false
+            surfaceBehindWebView: false,
+            // Whether the platform's media pipeline honours
+            // HTMLMediaElement.playbackRate. Chromium does; the webOS TV
+            // WebView's HW decoder clamps rate > 1.0 to 1.0 and slows
+            // rates < 1.0 imperfectly. Adapter overrides as needed.
+            controlsPlaybackRate: true
         },
 
         player: {

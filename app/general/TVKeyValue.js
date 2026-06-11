@@ -18,26 +18,37 @@
  *
  */
 
-//https://developer.android.com/reference/android/view/KeyEvent
-//overwrite from java dispatchKeyEvent()
-var KEY_PAUSE = 83; //overwrite key S = stop because p = play
-var KEY_PLAY = 80; //overwrite key P = play
+// webOS TV remote keymap. Adapted from upstream (Android) values to match
+// LG webOS Magic Remote keycodes — the dedicated Back button generates
+// keyCode 461, Enter is keyCode 13. Browser-dev users press Backspace (8)
+// for "back"; the cases in upstream switches list both KEY_RETURN and
+// KEY_KEYBOARD_BACKSPACE together so both platforms work.
 
-var KEY_STOP = 178;
-var KEY_PLAYPAUSE = 179;
+var KEY_PAUSE = 19; // Pause media key (Magic Remote)
+var KEY_PLAY = 415; // Play media key (Magic Remote)
+
+var KEY_STOP = 413; // Stop media key
+var KEY_PLAYPAUSE = 463; // PlayPause toggle key
 
 var KEY_LEFT = 37;
 var KEY_UP = 38;
 var KEY_RIGHT = 39;
 var KEY_DOWN = 40;
+// KEY_ENTER = OK on the Magic Remote. MUST be distinct from KEY_PLAY so
+// switch statements that case KEY_PLAY before KEY_ENTER don't collapse the
+// two. Same code (13) used to mean "OK + Play + PlayPause" all at once,
+// which made hold-OK impossible — case KEY_PLAY won the switch and ran the
+// short-press action immediately, the KEY_ENTER hold-detect timer never
+// armed. Keeping these separate restores Screens.js's hold-vs-click logic.
 var KEY_ENTER = 13;
 
-var KEY_PG_DOWN = 34;
-var KEY_PG_UP = 33;
+var KEY_PG_DOWN = 34; // Channel Down
+var KEY_PG_UP = 33; // Channel Up
 
-var KEY_RETURN = 113; //key #F2
+var KEY_RETURN = 461; // Back button on LG webOS
+var KEY_ESCAPE = 461;
 
-var KEY_KEYBOARD_BACKSPACE = 8; // http://developer.samsung.com/tv/develop/guides/user-interaction/keyboardime
+var KEY_KEYBOARD_BACKSPACE = 8;
 var KEY_KEYBOARD_DONE = 13;
 var KEY_KEYBOARD_SPACE = 32;
 

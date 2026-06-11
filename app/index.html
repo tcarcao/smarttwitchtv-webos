@@ -50,11 +50,27 @@
         <style>
             body,
             html {
-                background-color: rgba(0, 0, 0, 0);
+                background-color: #000;
                 font-family: 'Roboto', 'Roboto-Bold';
                 margin: auto;
                 overflow: hidden;
                 -webkit-text-stroke: 0.005em;
+            }
+            /* Override upstream's white-ish chat message divider — looks
+               washed out over translucent black chat bg. Solid black gives
+               crisp separation that reads cleanly. */
+            .chat_line {
+                border-bottom-color: rgba(0, 0, 0, 0.75) !important;
+            }
+            /* The login screen (#add_user_scroll) inherits transparent
+               .screen_holder, so the live preview tile, side panel and
+               feed grid bleed through and make the activation code
+               unreadable. Upstream's Android Activity has its own opaque
+               window; on web we have to paint our own. Solid black covers
+               everything underneath — Add User is a take-over screen, not
+               an overlay. */
+            #add_user_scroll {
+                background-color: #000;
             }
 
             .class_bold {

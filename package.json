@@ -6,10 +6,19 @@
     "dev": "vite",
     "build": "vite build",
     "build:webos": "bash release/scripts/build-webos.sh",
+    "doctor": "bash release/scripts/doctor.sh",
+    "sim": "bash release/scripts/sim-open.sh",
     "install:emulator": "ares-install --device emulator dist-ipk/com.fgl27.smarttwitchtv_0.0.1_all.ipk",
     "install:tv": "ares-install --device webostv dist-ipk/com.fgl27.smarttwitchtv_0.0.1_all.ipk",
     "launch:emulator": "ares-launch --device emulator com.fgl27.smarttwitchtv",
-    "launch:tv": "ares-launch --device webostv com.fgl27.smarttwitchtv"
+    "launch:tv": "ares-launch --device webostv com.fgl27.smarttwitchtv",
+    "inspect:emulator": "ares-inspect --device emulator --app com.fgl27.smarttwitchtv --open",
+    "inspect:tv": "ares-inspect --device webostv --app com.fgl27.smarttwitchtv --open",
+    "deploy:emulator": "bash release/scripts/deploy.sh emulator",
+    "deploy:tv": "bash release/scripts/deploy.sh webostv",
+    "debug:tv": "bash release/scripts/tv-debug.sh",
+    "debug:emulator": "DEVICE=emulator bash release/scripts/tv-debug.sh",
+    "setup:tv": "bash release/scripts/tv-setup.sh"
   },
   "devDependencies": {
     "vite": "^6.0.0"
