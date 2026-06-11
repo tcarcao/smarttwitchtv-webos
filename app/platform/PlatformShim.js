@@ -511,23 +511,37 @@
             // StartFeedPlayer is never invoked — main player stays
             // uninterrupted, the feed row still renders thumbnails.
             var multi = Platform.capabilities && Platform.capabilities.multiPlayer;
-            if (codec === 'avc' || codec === 'h264') {
-                return JSON.stringify([{
-                    CanonicalName: 'platform.web.h264.decoder',
-                    name: 'platform.web.h264.decoder',
-                    nameType: 'platform.web.h264.decodervideo/avc',
-                    type: 'video/avc',
-                    instances: multi ? 4 : 1,
-                    isHardwareAccelerated: true,
-                    isSoftwareOnly: false,
-                    maxbitrate: '120 Mbps',
-                    maxlevel: '5.2',
-                    maxresolution: '4096x4096',
-                    resolutions: '1080p : 60 fps',
-                    supportsIsHw: true
-                }]);
-            }
-            return JSON.stringify([]);
+            var probes = {
+                avc:  {mime: 'video/mp4; codecs="avc1.640028"',      type: 'video/avc',  name: 'h264'},
+                hevc: {mime: 'video/mp4; codecs="hvc1.1.6.L153.B0"', type: 'video/hevc', name: 'hevc'},
+                av01: {mime: 'video/mp4; codecs="av01.0.08M.08"',    type: 'video/av01', name: 'av1'}
+            };
+            var probe = probes[codec];
+            if (!probe) return JSON.stringify([]);
+            // h264 is the universal baseline — always report it. hevc/av01
+            // only when MSE can actually decode them: Settings.js matches
+            // 'hevc'/'av01' inside .type to set Settings_HEVCSupported /
+            // Settings_AV1Supported, which gate the supported_codecs usher
+            // param (Twitch's 1440p/4K enhanced renditions need h265/av1).
+            var supported = codec === 'avc' ||
+                !!(window.MediaSource &&
+                   typeof window.MediaSource.isTypeSupported === 'function' &&
+                   window.MediaSource.isTypeSupported(probe.mime));
+            if (!supported) return JSON.stringify([]);
+            return JSON.stringify([{
+                CanonicalName: 'platform.web.' + probe.name + '.decoder',
+                name: 'platform.web.' + probe.name + '.decoder',
+                nameType: 'platform.web.' + probe.name + '.decodervideo/' + codec,
+                type: probe.type,
+                instances: multi ? 4 : 1,
+                isHardwareAccelerated: true,
+                isSoftwareOnly: false,
+                maxbitrate: '120 Mbps',
+                maxlevel: '5.2',
+                maxresolution: '4096x4096',
+                resolutions: '1080p : 60 fps',
+                supportsIsHw: true
+            }]);
         },
         SetSmallPlayerBandwidth: function(/* bitrate, resolution */) {},
         SetSmallPlayerBitrate: function(/* bitrate, resolution */) {},

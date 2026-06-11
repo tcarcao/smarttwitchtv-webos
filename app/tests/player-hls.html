@@ -194,6 +194,43 @@
         }, 3000);
     });
 
+    // ---- Task 5: codec capabilities + usher URL parameters ----
+    tests.push(function testCodecCaps(done) {
+        var ms = window.MediaSource;
+        function shimReports(codec) {
+            var arr = JSON.parse(window.Android.getcodecCapabilities(codec));
+            return arr.length > 0 ? arr[0] : null;
+        }
+        var hevcExpected = !!(ms && ms.isTypeSupported('video/mp4; codecs="hvc1.1.6.L153.B0"'));
+        var av1Expected  = !!(ms && ms.isTypeSupported('video/mp4; codecs="av01.0.08M.08"'));
+        record('codec caps: avc always reported', !!shimReports('avc'));
+        record('codec caps: hevc matches MediaSource (' + hevcExpected + ')', !!shimReports('hevc') === hevcExpected);
+        record('codec caps: av01 matches MediaSource (' + av1Expected + ')', !!shimReports('av01') === av1Expected);
+        var hevcEntry = shimReports('hevc');
+        record('codec caps: hevc .type is video/hevc', !hevcExpected || (hevcEntry && hevcEntry.type === 'video/hevc'));
+        var av1Entry = shimReports('av01');
+        record('codec caps: av01 .type is video/av01', !av1Expected || (av1Entry && av1Entry.type === 'video/av01'));
+        done();
+    });
+
+    tests.push(function testUsherParams(done) {
+        var build = window.PlayHLSPlatform && window.PlayHLSPlatform._buildUsherUrl;
+        if (!build) {
+            record('usher url: _buildUsherUrl exported for tests', false, 'missing');
+            done();
+            return;
+        }
+        var url = build('TestChannel', {value: 'tok"en', signature: 'sig'});
+        record('usher url: lowercased channel path', url.indexOf('/hls/testchannel.m3u8') !== -1, url);
+        record('usher url: player_backend=mediaplayer', url.indexOf('player_backend=mediaplayer') !== -1);
+        record('usher url: playlist_include_framerate', url.indexOf('playlist_include_framerate=true') !== -1);
+        record('usher url: fast_bread=false (no proprietary prefetch tags)', url.indexOf('fast_bread=false') !== -1);
+        record('usher url: allow_source=true', url.indexOf('allow_source=true') !== -1);
+        record('usher url: supported_codecs ends with h264', /supported_codecs=[^&]*h264/.test(url), url);
+        record('usher url: token urlencoded', url.indexOf('token=tok%22en') !== -1);
+        done();
+    });
+
     runNext();
 })();
 </script>

@@ -54,14 +54,35 @@
         });
     }
 
+    function _supportedCodecsParam() {
+        var codecs = [];
+        try {
+            var ms = window.MediaSource;
+            if (ms && ms.isTypeSupported('video/mp4; codecs="av01.0.08M.08"')) codecs.push('av1');
+            if (ms && ms.isTypeSupported('video/mp4; codecs="hvc1.1.6.L153.B0"')) codecs.push('h265');
+        } catch (e) { /* a probe failure must never block playback */ }
+        codecs.push('h264');
+        return codecs.join(',');
+    }
+
     function _buildUsherUrl(channelLogin, token) {
+        var sessionId = Math.floor(Math.random() * 1e16);
+        // Parameter set mirrors upstream Play_base_live_links
+        // (app/specific/PlayHLS.js): mediaplayer backend + framerate info
+        // in variant names + fast_bread=false (Twitch's low-latency
+        // prefetch tags are proprietary; hls.js ignores them anyway).
         var params = [
             'client_id=' + encodeURIComponent(TWITCH_CLIENT_ID),
             'token=' + encodeURIComponent(token.value),
             'sig=' + encodeURIComponent(token.signature),
+            'player_backend=mediaplayer',
+            'reassignments_supported=true',
+            'playlist_include_framerate=true',
             'allow_source=true',
-            'allow_audio_only=true',
-            'p=' + Math.floor(Math.random() * 999999)
+            'fast_bread=false',
+            'supported_codecs=' + _supportedCodecsParam(),
+            'p=' + Math.floor(Math.random() * 999999),
+            'play_session_id=' + sessionId + '' + sessionId
         ].join('&');
         return 'https://usher.ttvnw.net/api/channel/hls/' + encodeURIComponent(channelLogin.toLowerCase()) + '.m3u8?' + params;
     }
@@ -110,6 +131,8 @@
 
     window['PlayHLSPlatform'] = {
         playLiveChannel: playLiveChannel,
-        stop: stop
+        stop: stop,
+        // Test seam (app/tests/player-hls.html asserts the parameter set).
+        _buildUsherUrl: _buildUsherUrl
     };
 })();
