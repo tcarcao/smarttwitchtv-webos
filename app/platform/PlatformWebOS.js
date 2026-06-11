@@ -662,8 +662,14 @@
         if (_videoEl) _videoEl.currentTime = positionMs / 1000;
     };
 
-    Platform.player.setQuality = function(/* index */) {
-        // hls.js auto-quality on by default; explicit selection v1.6.x+
+    Platform.player.setQuality = function(position) {
+        if (!_hls) return;
+        // Upstream position semantics (Play.js Play_getQualities):
+        // getQualities() lists 'Auto' first and assigns position = i - 1,
+        // so -1 = Auto and 0..n-1 map 1:1 onto _hls.levels. nextLevel
+        // switches at the next fragment without flushing the buffer.
+        var p = parseInt(position, 10);
+        _hls.nextLevel = (isNaN(p) || p < 0 || p >= _hls.levels.length) ? -1 : p;
     };
 
     Platform.player.getQualities = function() {

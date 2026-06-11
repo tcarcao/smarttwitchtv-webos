@@ -167,6 +167,34 @@
         done();
     });
 
+    // ---- Task 4: explicit quality selection ----
+    // NOTE: h.nextLevel reads streamController.nextLevel (next buffered frag level),
+    // which is always -1 in this test environment with no real media buffering.
+    // The observable side-effect of the setter is levelController.manualLevelIndex
+    // (exposed as h.levelController.manualLevel), which IS set synchronously.
+    tests.push(function testSetQuality(done) {
+        var h = startCachedPlayer();
+        if (!h) { record('setQuality: hls instance', false); done(); return; }
+        var parsed = false;
+        h.on(window.Hls.Events.MANIFEST_PARSED, function() {
+            parsed = true;
+            var lc = h.levelController;
+            Platform.player.setQuality(1);
+            record('setQuality(1) → nextLevel 1', lc.manualLevelIndex === 1, 'manualLevelIndex=' + lc.manualLevelIndex);
+            Platform.player.setQuality(-1);
+            record('setQuality(-1) → auto (nextLevel -1)', lc.manualLevelIndex === -1, 'manualLevelIndex=' + lc.manualLevelIndex);
+            Platform.player.setQuality(99);
+            record('setQuality(out of range) → auto', lc.manualLevelIndex === -1, 'manualLevelIndex=' + lc.manualLevelIndex);
+            done();
+        });
+        setTimeout(function() {
+            if (!parsed) {
+                record('setQuality: MANIFEST_PARSED before timeout', false, 'timed out');
+                done();
+            }
+        }, 3000);
+    });
+
     runNext();
 })();
 </script>
