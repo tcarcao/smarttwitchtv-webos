@@ -469,6 +469,26 @@
             BaseLoader.call(this, config);
             var inner = this;
             var origLoad = this.load.bind(this);
+            var origAbort = this.abort.bind(this);
+            var origDestroy = this.destroy.bind(this);
+            var timer = null;
+            function cancelPending() {
+                if (timer !== null) {
+                    clearTimeout(timer);
+                    timer = null;
+                }
+            }
+            // hls.js aborts/destroys loaders on stop and restart; a real
+            // XHR dies with the abort, so the pending cached response
+            // must die too instead of firing into a torn-down instance.
+            this.abort = function () {
+                cancelPending();
+                return origAbort();
+            };
+            this.destroy = function () {
+                cancelPending();
+                return origDestroy();
+            };
             this.load = function (context, cfg, callbacks) {
                 if (context && context.type === 'manifest') {
                     var now = performance.now();
@@ -480,7 +500,8 @@
                     stats.total = manifestString.length;
                     // Async so hls.js finishes wiring its event handlers
                     // before the response lands (sync callbacks break it).
-                    setTimeout(function () {
+                    timer = setTimeout(function () {
+                        timer = null;
                         callbacks.onSuccess(
                             {url: context.url, data: manifestString},
                             stats,

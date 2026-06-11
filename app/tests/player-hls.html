@@ -101,6 +101,39 @@
         }, 2000);
     });
 
+    tests.push(function testAbortCancelsPendingManifest(done) {
+        // The loader class hls.js was configured with IS our cached
+        // loader — exercise its contract directly: a pending cached
+        // response must die when hls.js aborts/destroys the loader
+        // (stop or channel-switch right after start), exactly like a
+        // real in-flight XHR would.
+        var h = startCachedPlayer();
+        if (!h || !h.config || typeof h.config.loader !== 'function') {
+            record('abort contract: cached loader class reachable via hls config', false);
+            done();
+            return;
+        }
+        var LoaderClass = h.config.loader;
+        Platform.player.stop();
+
+        var abortCalls = 0, destroyCalls = 0;
+        var a = new LoaderClass({});
+        a.load({type: 'manifest', url: 'https://fake-usher.example.com/x.m3u8'}, {}, {
+            onSuccess: function() { abortCalls++; }
+        });
+        a.abort();
+        var d = new LoaderClass({});
+        d.load({type: 'manifest', url: 'https://fake-usher.example.com/x.m3u8'}, {}, {
+            onSuccess: function() { destroyCalls++; }
+        });
+        d.destroy();
+        setTimeout(function() {
+            record('abort contract: onSuccess NOT fired after abort()', abortCalls === 0, 'calls=' + abortCalls);
+            record('abort contract: onSuccess NOT fired after destroy()', destroyCalls === 0, 'calls=' + destroyCalls);
+            done();
+        }, 100);
+    });
+
     runNext();
 })();
 </script>
