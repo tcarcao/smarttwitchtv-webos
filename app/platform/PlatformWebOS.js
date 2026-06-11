@@ -455,6 +455,49 @@
         return _ProxyLoader;
     }
 
+    // Serves the multivariant playlist that the app JS already fetched
+    // (passed through StartAuto as manifestString) instead of letting
+    // hls.js re-fetch the usher URL. Mirrors upstream Android's forked
+    // DefaultHttpDataSource.setMainPlaylistBytes: every usher hit creates
+    // a NEW playback session and costs a round trip, and a refetch can
+    // hand the player a different variant set than the one the quality
+    // menu was built from. Only requests with context.type === 'manifest'
+    // (the multivariant playlist) are intercepted; level playlists and
+    // segments flow through BaseLoader untouched.
+    function _makeCachedManifestLoader(BaseLoader, manifestString) {
+        function CachedManifestLoader(config) {
+            BaseLoader.call(this, config);
+            var inner = this;
+            var origLoad = this.load.bind(this);
+            this.load = function (context, cfg, callbacks) {
+                if (context && context.type === 'manifest') {
+                    var now = performance.now();
+                    var stats = inner.stats;
+                    stats.loading.start = now;
+                    stats.loading.first = now;
+                    stats.loading.end = now;
+                    stats.loaded = manifestString.length;
+                    stats.total = manifestString.length;
+                    // Async so hls.js finishes wiring its event handlers
+                    // before the response lands (sync callbacks break it).
+                    setTimeout(function () {
+                        callbacks.onSuccess(
+                            {url: context.url, data: manifestString},
+                            stats,
+                            context,
+                            null
+                        );
+                    }, 0);
+                    return;
+                }
+                return origLoad(context, cfg, callbacks);
+            };
+        }
+        CachedManifestLoader.prototype = Object.create(BaseLoader.prototype);
+        CachedManifestLoader.prototype.constructor = CachedManifestLoader;
+        return CachedManifestLoader;
+    }
+
     function _isDirectMedia(uri) {
         if (!uri) return false;
         var path = uri.split('?')[0].toLowerCase();
@@ -494,9 +537,16 @@
             // Only use the proxy loader in Simulator. On real TV no rewrite
             // needed (no CORS), so default loader fetches CloudFront directly.
             var hlsConfig = {};
+            var BaseLoader = window.Hls.DefaultConfig.loader;
             if (_isSimulator()) {
                 var ProxyLoader = _getProxyLoader();
-                if (ProxyLoader) hlsConfig.loader = ProxyLoader;
+                if (ProxyLoader) {
+                    BaseLoader = ProxyLoader;
+                    hlsConfig.loader = ProxyLoader;
+                }
+            }
+            if (args.manifestString && args.manifestString.indexOf('#EXTM3U') === 0) {
+                hlsConfig.loader = _makeCachedManifestLoader(BaseLoader, args.manifestString);
             }
             _hls = new window.Hls(hlsConfig);
             _hls.loadSource(startUri);
@@ -510,6 +560,12 @@
             v.src = startUri;
             v.play();
         }
+    };
+
+    // Dev/test escape hatch: the HTML test pages and chrome-devtools
+    // validation need the live hls.js instance. Not used by app code.
+    Platform.player.getHlsInstance = function() {
+        return _hls;
     };
 
     // setRect: reposition the same <video> without restarting playback.
