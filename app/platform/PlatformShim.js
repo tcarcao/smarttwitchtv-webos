@@ -1098,11 +1098,47 @@
         }, 'Main_CheckUpdate');
     }
 
+    // ============ Changelog/about dialog scrolling ============
+    //
+    // Upstream's #dialog_about box (.about_dialogs) has no height cap and
+    // the overlay is overflow:hidden, while the active key handler ignores
+    // UP/DOWN — a changelog taller than the screen is simply unreachable
+    // (verified in Chrome and on the TV). Cap + scroll it from the shim.
+    function _installChangelogScroll() {
+        if (typeof window.Main_UpdateDialogKeyFun !== 'function') return;
+
+        var style = document.createElement('style');
+        style.textContent =
+            '#dialog_about .about_dialogs{max-height:92%;overflow-y:auto;}' +
+            '#dialog_about .about_dialogs::-webkit-scrollbar{width:0.4vh;}' +
+            '#dialog_about .about_dialogs::-webkit-scrollbar-thumb{background:#666;border-radius:0.2vh;}';
+        document.head.appendChild(style);
+
+        // Main_showUpdateDialog resolves the global by name at show time, so
+        // wrapping here covers every later registration (and the matching
+        // removeEventListener on hide sees the same patched reference).
+        var orig = window.Main_UpdateDialogKeyFun;
+        window.Main_UpdateDialogKeyFun = _setName(function(event) {
+            var up = typeof window.KEY_UP !== 'undefined' ? window.KEY_UP : 38;
+            var down = typeof window.KEY_DOWN !== 'undefined' ? window.KEY_DOWN : 40;
+            if ((event.keyCode === up || event.keyCode === down) &&
+                typeof window.Main_isAboutDialogVisible === 'function' &&
+                window.Main_isAboutDialogVisible()) {
+                var box = document.querySelector('#dialog_about .about_dialogs');
+                if (box) {
+                    box.scrollTop += (event.keyCode === down ? 1 : -1) * Math.round(box.clientHeight * 0.4);
+                }
+            }
+            return orig(event);
+        }, 'Main_UpdateDialogKeyFun');
+    }
+
     function _bootShimPatches() {
         _installRefreshTokenCapture();
         _installTokenRefreshScheduler();
         _installLiveNotifier();
         _installUpdateCheck();
+        _installChangelogScroll();
     }
 
     // Debug hook (test-only): expose helpers on a single window namespace

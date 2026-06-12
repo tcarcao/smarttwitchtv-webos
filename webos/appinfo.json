@@ -7,7 +7,7 @@
     "title": "SmartTV Twitch",
     "icon": "icon.png",
     "largeIcon": "largeIcon.png",
-    "iconColor": "#9147ff",
+    "iconColor": "#303030",
     "uiRevision": "2",
     "appDescription": "Twitch client for LG webOS",
     "disableBackHistoryAPI": true,
