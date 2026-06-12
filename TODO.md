@@ -15,6 +15,21 @@ Items that still need work. Permanent platform/hardware limitations are in
   Needs a small string table in PlatformShim keyed off upstream's language
   setting.
 
+## Explorations
+
+- **Hybrid hosted distribution (post-store).** Upstream's model — app served
+  from github.io — doesn't transfer directly: their Twitch traffic goes
+  through the native Android HTTP bridge, ours is browser XHR that only
+  escapes CORS because the packaged app runs from a file:// origin (a pure
+  hosted page would be blocked by usher.ttvnw.net, same reason desktop dev
+  needs the /__usher proxy). The workable variant is a hybrid: keep the
+  packaged IPK (retains the CORS exemption) but have a thin index.html load
+  the JS bundles via `<script src>` from our hosting, version-pinned by
+  version.json — most of the "ship fixes without IPK reinstall / store
+  re-review" benefit with no proxy server. Revisit after LG store approval;
+  de-risk first with a CDP probe on the TV fetching usher from an https
+  origin to confirm where webOS draws its CORS line.
+
 ## Tooling — quality-of-life
 
 - **`debug:tv` rough edges:**
