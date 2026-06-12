@@ -62,8 +62,32 @@ cp "$ROOT/webos/icon.png" "$STAGE/icon.png"
 cp "$ROOT/webos/largeIcon.png" "$STAGE/largeIcon.png"
 
 # Build. -o sets the output directory; ares-package picks the filename.
-ares-package "$STAGE" -o "$OUT"
+#
+# @webos-tools/cli 3.2.4 crashes in its post-package temp cleanup
+# ("rimraf is not a function") AFTER writing a complete IPK — on every
+# Node version we tried (22 and 24). Tolerate the exit code and verify
+# the package structurally instead, so a real packaging failure still
+# fails the build.
+ares-package "$STAGE" -o "$OUT" || echo "(ares-package exited non-zero — verifying IPK anyway)"
+
+IPK="$(ls "$OUT"/*.ipk 2>/dev/null | head -1)"
+if [ -z "$IPK" ]; then
+    echo "no .ipk produced — check ares-package output above" >&2
+    exit 3
+fi
+
+# Structural verification: ar members + the files the app can't boot without.
+if ! ar t "$IPK" | grep -q "^data.tar.gz$"; then
+    echo "IPK at $IPK is malformed (missing data.tar.gz)" >&2
+    exit 4
+fi
+for f in appinfo.json index.html platform/PlatformWebOS.js; do
+    if ! ar p "$IPK" data.tar.gz | tar tz | grep -q "/$f\$"; then
+        echo "IPK is missing $f" >&2
+        exit 5
+    fi
+done
 
 echo
-echo "IPK built:"
-ls -la "$OUT"/*.ipk 2>/dev/null || { echo "(no .ipk produced — check ares-package output above)"; exit 3; }
+echo "IPK built and verified:"
+ls -la "$OUT"/*.ipk

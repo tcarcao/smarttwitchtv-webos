@@ -12,8 +12,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # Node 22 LTS pinned: @webos-tools/cli crashes post-package on
-      # Node 24 (rimraf TypeError) — see release/README.md.
+      # Node 22 LTS. (@webos-tools/cli 3.2.4 crashes in post-package
+      # cleanup on every Node version; build-webos.sh tolerates it and
+      # verifies the IPK structurally instead.)
       - uses: actions/setup-node@v4
         with:
           node-version: 22
