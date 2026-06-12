@@ -337,7 +337,7 @@
                 typeof speed === 'number' && speed !== 1 &&
                 !_warnedAboutPlaybackRate) {
                 _warnedAboutPlaybackRate = true;
-                _showToast('Playback speed control isn’t supported on this TV');
+                _showToast(_t('speed_unsupported'));
             }
             Platform.player.setPlaybackSpeed(speed);
         },
@@ -734,12 +734,11 @@
                 window.Main_values.IsUpDating = false;
                 if (typeof window.Main_SaveValues === 'function') window.Main_SaveValues();
             }
-            // TODO(i18n): upstream's STR_* language tables don't cover this
-            // sentence; ships English-only until the shim grows a string table.
-            _showToast('Updates will install automatically once the app is in the LG Content Store. Until then: github.com/tcarcao/smarttwitchtv-webos/releases');
+            _showToast(_t('update_store') + 'github.com/tcarcao/smarttwitchtv-webos/releases');
         },
-        // Test seam (app/tests/player-hls.html asserts the comparator).
-        _isNewerVersion:       function(remote, local) { return _isNewerVersion(remote, local); }
+        // Test seams (app/tests/player-hls.html asserts these).
+        _isNewerVersion:       function(remote, local) { return _isNewerVersion(remote, local); },
+        _t:                    function(key) { return _t(key); }
     };
 
     // Default-fallback: log unmapped property accesses but DON'T throw.
@@ -990,7 +989,7 @@
                     var s = nowLive[uid];
                     var who = s.user_name || s.user_login || 'A followed channel';
                     var what = s.title ? ' — ' + String(s.title).slice(0, 80) : '';
-                    _showToast(who + ' is live' + what);
+                    _showToast(who + _t('is_live') + what);
                 }
             });
             _notifKnownLive = nowLive;
@@ -1021,6 +1020,67 @@
     function _setName(fn, name) {
         try { Object.defineProperty(fn, 'name', {value: name, configurable: true}); } catch (e) {}
         return fn;
+    }
+
+    // ============ Shim string table ============
+    //
+    // Strings the platform layer adds don't exist in upstream's STR_*
+    // language tables. Translated for every language upstream ships
+    // (en/pt/es/fr/ru/uk/tr), keyed off upstream's Settings_AppLang
+    // global (read at call time, so language switches apply immediately).
+    var _SHIM_STRINGS = {
+        update_store: {
+            en: 'Updates will install automatically once the app is in the LG Content Store. Until then: ',
+            pt: 'As atualizações serão instaladas automaticamente quando o app estiver na LG Content Store. Até lá: ',
+            es: 'Las actualizaciones se instalarán automáticamente cuando la app esté en la LG Content Store. Hasta entonces: ',
+            fr: 'Les mises à jour s’installeront automatiquement quand l’appli sera sur le LG Content Store. En attendant : ',
+            ru: 'Обновления будут устанавливаться автоматически, когда приложение появится в LG Content Store. А пока: ',
+            uk: 'Оновлення встановлюватимуться автоматично, щойно застосунок з’явиться в LG Content Store. А поки: ',
+            tr: 'Uygulama LG Content Store’a eklendiğinde güncellemeler otomatik yüklenecek. O zamana kadar: '
+        },
+        speed_unsupported: {
+            en: 'Playback speed control isn’t supported on this TV',
+            pt: 'O controle de velocidade de reprodução não é suportado nesta TV',
+            es: 'El control de velocidad de reproducción no es compatible con este TV',
+            fr: 'Le contrôle de la vitesse de lecture n’est pas pris en charge sur ce téléviseur',
+            ru: 'Управление скоростью воспроизведения не поддерживается на этом телевизоре',
+            uk: 'Керування швидкістю відтворення не підтримується на цьому телевізорі',
+            tr: 'Oynatma hızı kontrolü bu TV’de desteklenmiyor'
+        },
+        changelog_pointer: {
+            en: 'Release notes load from GitHub when the update check runs.',
+            pt: 'As notas de versão são carregadas do GitHub quando a verificação de atualização é executada.',
+            es: 'Las notas de versión se cargan desde GitHub al ejecutar la comprobación de actualizaciones.',
+            fr: 'Les notes de version sont chargées depuis GitHub lors de la vérification des mises à jour.',
+            ru: 'Список изменений загружается с GitHub при проверке обновлений.',
+            uk: 'Список змін завантажується з GitHub під час перевірки оновлень.',
+            tr: 'Sürüm notları, güncelleme denetimi çalıştığında GitHub’dan yüklenir.'
+        },
+        all_releases: {
+            en: 'All releases: ',
+            pt: 'Todas as versões: ',
+            es: 'Todas las versiones: ',
+            fr: 'Toutes les versions : ',
+            ru: 'Все версии: ',
+            uk: 'Усі версії: ',
+            tr: 'Tüm sürümler: '
+        },
+        is_live: {
+            en: ' is live',
+            pt: ' está ao vivo',
+            es: ' está en vivo',
+            fr: ' est en direct',
+            ru: ' в эфире',
+            uk: ' в ефірі',
+            tr: ' yayında'
+        }
+    };
+
+    function _t(key) {
+        var entry = _SHIM_STRINGS[key];
+        if (!entry) return '';
+        var lang = (typeof window.Settings_AppLang === 'string' ? window.Settings_AppLang : '').slice(0, 2);
+        return entry[lang] || entry.en;
     }
 
     // ============ Update check (GitHub Releases) ============
@@ -1064,14 +1124,20 @@
 
         // Until the first successful check replaces it, the baked-in
         // changelog is the ANDROID app's release history — show a pointer
-        // instead of another product's notes.
-        window.version.changelog = [{
-            title: 'SmartTwitchTV for webOS',
-            changes: [
-                'Release notes load from GitHub when the update check runs.',
-                'All releases: github.com/tcarcao/smarttwitchtv-webos/releases'
-            ]
-        }];
+        // instead of another product's notes. Set immediately (English),
+        // then re-set translated once upstream restores the language
+        // (Settings_RestoreAppLang runs after this patch installs).
+        function _setChangelogPointer() {
+            window.version.changelog = [{
+                title: 'SmartTwitchTV for webOS',
+                changes: [
+                    _t('changelog_pointer'),
+                    _t('all_releases') + 'github.com/tcarcao/smarttwitchtv-webos/releases'
+                ]
+            }];
+        }
+        _setChangelogPointer();
+        setTimeout(_setChangelogPointer, 5000);
 
         // Upstream's Main_Changelog hardcodes the Android changelog link
         // (tinyurl.com/sttvchanges) into the dialog header — post-process

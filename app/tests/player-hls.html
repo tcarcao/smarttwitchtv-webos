@@ -276,6 +276,17 @@
             record('update: null-safe', cmp(null, '0.1.0') === false && cmp('0.1.0', null) === false);
         }
         record('update: getInstallFromPLay reports sideload', !!window.Android && window.Android.getInstallFromPLay() === false);
+        var t = window.Android && window.Android._t;
+        record('i18n: _t exposed', typeof t === 'function');
+        if (typeof t === 'function') {
+            record('i18n: defaults to English without Settings_AppLang', t('is_live') === ' is live');
+            window.Settings_AppLang = 'pt_BR';
+            record('i18n: follows Settings_AppLang (pt_BR)', t('is_live') === ' está ao vivo');
+            window.Settings_AppLang = 'xx_XX';
+            record('i18n: unknown language falls back to English', t('is_live') === ' is live');
+            delete window.Settings_AppLang;
+            record('i18n: unknown key returns empty string', t('nope') === '');
+        }
         done();
     });
 
