@@ -72,15 +72,20 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           BODY="$(gh release view "$GITHUB_REF_NAME" --json body -q .body)"
+          # generate-notes only lists PR titles; direct-push releases get
+          # just the compare link. Fall back to the annotated tag message.
+          TAG_MSG="$(git tag -l --format='%(contents:body)' "$GITHUB_REF_NAME")"
           node -e '
             const fs = require("fs");
             const f = "dist-ipk/version.json";
             const j = JSON.parse(fs.readFileSync(f, "utf8"));
-            const lines = process.argv[1].split(/\r?\n/)
+            const clean = (txt) => String(txt || "").split(/\r?\n/)
               .map(s => s.replace(/^[-*]\s+/, "").trim())
               .filter(s => s && !s.startsWith("#") && !s.startsWith("**Full Changelog"));
-            j.changelog = [{title: "Version " + j.version, changes: lines.slice(0, 15)}];
+            const lines = clean(process.argv[1]);
+            const fallback = clean(process.argv[2]);
+            j.changelog = [{title: "Version " + j.version, changes: (lines.length ? lines : fallback).slice(0, 15)}];
             fs.writeFileSync(f, JSON.stringify(j, null, 2) + "\n");
-          ' "$BODY"
+          ' "$BODY" "$TAG_MSG"
           cat dist-ipk/version.json
           gh release upload "$GITHUB_REF_NAME" dist-ipk/version.json --clobber
