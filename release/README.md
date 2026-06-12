@@ -71,6 +71,5 @@ unmodified upstream `Play.js` / `Screens.js` / `OSInterface.js`.
 - **DevTools URL won't open** — `ares-inspect --open` requires a working
   browser binding. Without `--open` it just prints the URL you can paste.
 - **CORS errors on TV** — should not happen (TV WebView has no cross-origin
-  block), but if usher.ttvnw.net behaves like a browser, we'd need a Luna
-  service proxy. Flagged in `AFK-SESSION-SUMMARY.md` as a potential
-  v1.7.x slice.
+  block; verified with real playback on an LG TV). If a future webOS version
+  starts enforcing it, a Luna service proxy would be the fallback.
