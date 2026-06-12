@@ -77,12 +77,17 @@ if [ -z "$IPK" ]; then
 fi
 
 # Structural verification: ar members + the files the app can't boot without.
-if ! ar t "$IPK" | grep -q "^data.tar.gz$"; then
+# Capture listings first: piping straight into `grep -q` makes grep exit at
+# the first match, the producer dies on SIGPIPE, and pipefail turns that
+# into a bogus failure (GNU tar; macOS tar is silent about it).
+AR_MEMBERS="$(ar t "$IPK")"
+if ! printf '%s\n' "$AR_MEMBERS" | grep -q "^data.tar.gz$"; then
     echo "IPK at $IPK is malformed (missing data.tar.gz)" >&2
     exit 4
 fi
+DATA_FILES="$(ar p "$IPK" data.tar.gz | tar tz)"
 for f in appinfo.json index.html platform/PlatformWebOS.js; do
-    if ! ar p "$IPK" data.tar.gz | tar tz | grep -q "/$f\$"; then
+    if ! printf '%s\n' "$DATA_FILES" | grep -q "/$f\$"; then
         echo "IPK is missing $f" >&2
         exit 5
     fi
