@@ -15,12 +15,12 @@ jobs:
   release:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       # Node 22 LTS. (@webos-tools/cli 3.2.4 crashes in post-package
       # cleanup on every Node version; build-webos.sh tolerates it and
       # verifies the IPK structurally instead.)
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         with:
           node-version: 22
 
