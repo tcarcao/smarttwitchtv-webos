@@ -80,9 +80,38 @@
         // High version on all three components — upstream's Main_needUpdate
         // checks parseFloat(major.minor) < VersionBase (3.0) OR parseInt(patch)
         // < publishVersionCode (379). 999.99.99999 satisfies both, so the
-        // forced-update dialog never appears. Our actual fork version lives
-        // in package.json + git.
+        // forced-update dialog never appears. The REAL packaged version is
+        // packageVersion() below — keep the two distinct.
         return '999.99.99999';
+    };
+
+    var _pkgVersionPromise = null;
+    Platform.device.packageVersion = function() {
+        // Real version from the IPK's appinfo.json (bundle root, next to
+        // index.html — the release pipeline stamps it from the git tag).
+        // Resolves null when unreadable so the update check skips silently
+        // instead of false-positiving against '0.0.0'.
+        if (_pkgVersionPromise) return _pkgVersionPromise;
+        _pkgVersionPromise = new Promise(function(resolve) {
+            try {
+                var xhr = new XMLHttpRequest();
+                xhr.open('GET', 'appinfo.json', true);
+                xhr.timeout = 4000;
+                xhr.onload = function() {
+                    try {
+                        resolve(JSON.parse(xhr.responseText).version || null);
+                    } catch (e) {
+                        resolve(null);
+                    }
+                };
+                xhr.onerror = function() { resolve(null); };
+                xhr.ontimeout = function() { resolve(null); };
+                xhr.send();
+            } catch (e) {
+                resolve(null);
+            }
+        });
+        return _pkgVersionPromise;
     };
 
     // -- log --

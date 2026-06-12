@@ -63,6 +63,11 @@
         // Our actual fork version is tracked in package.json + git.
         return '999.99.99999';
     };
+    Platform.device.packageVersion = function() {
+        // Dev build has no packaged appinfo.json; report the same high dev
+        // version as appVersion() so the GitHub update check stays quiet.
+        return Promise.resolve('999.99.99999');
+    };
 
     // -- log --
     Platform.log.info = function(msg) {

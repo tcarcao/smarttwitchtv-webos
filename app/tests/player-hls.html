@@ -264,6 +264,21 @@
         done();
     });
 
+    // ---- Update check helpers (shim) ----
+    tests.push(function testUpdateHelpers(done) {
+        var cmp = window.Android && window.Android._isNewerVersion;
+        record('update: _isNewerVersion exposed', typeof cmp === 'function');
+        if (typeof cmp === 'function') {
+            record('update: 0.2.0 newer than 0.1.0', cmp('0.2.0', '0.1.0') === true);
+            record('update: 0.1.0 not newer than itself', cmp('0.1.0', '0.1.0') === false);
+            record('update: 0.1.0 not newer than 999.99.99999 (dev)', cmp('0.1.0', '999.99.99999') === false);
+            record('update: 0.10.0 newer than 0.9.9 (numeric, not lexical)', cmp('0.10.0', '0.9.9') === true);
+            record('update: null-safe', cmp(null, '0.1.0') === false && cmp('0.1.0', null) === false);
+        }
+        record('update: getInstallFromPLay reports sideload', !!window.Android && window.Android.getInstallFromPLay() === false);
+        done();
+    });
+
     runNext();
 })();
 </script>

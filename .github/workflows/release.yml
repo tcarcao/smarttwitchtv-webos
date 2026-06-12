@@ -63,3 +63,24 @@ jobs:
             dist-ipk/*.ipk dist-ipk/version.json \
             --title "$GITHUB_REF_NAME" \
             --generate-notes
+
+      # The in-app update dialog renders version.changelog — fold the
+      # generated release notes into version.json after creation (the notes
+      # don't exist before --generate-notes runs).
+      - name: Attach changelog to version.json
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          BODY="$(gh release view "$GITHUB_REF_NAME" --json body -q .body)"
+          node -e '
+            const fs = require("fs");
+            const f = "dist-ipk/version.json";
+            const j = JSON.parse(fs.readFileSync(f, "utf8"));
+            const lines = process.argv[1].split(/\r?\n/)
+              .map(s => s.replace(/^[-*]\s+/, "").trim())
+              .filter(s => s && !s.startsWith("#") && !s.startsWith("**Full Changelog"));
+            j.changelog = [{title: "Version " + j.version, changes: lines.slice(0, 15)}];
+            fs.writeFileSync(f, JSON.stringify(j, null, 2) + "\n");
+          ' "$BODY"
+          cat dist-ipk/version.json
+          gh release upload "$GITHUB_REF_NAME" dist-ipk/version.json --clobber

@@ -718,7 +718,26 @@
         UpdateBlockedGames:    function(/* json */) {},
         mSetPlayerSize:        function(/* size */) {},
         mCheckRefreshToast:    function(/* type */) {},
-        setAppToken:           function(/* token */) {}
+        setAppToken:           function(/* token */) {},
+
+        // ============ Update flow ============
+        // A side-loaded webOS app can't self-install an IPK (docs/adrs/0003
+        // territory: unprivileged). The update dialog's confirm therefore
+        // becomes guidance instead of an install.
+        getInstallFromPLay:    function() { return false; },
+        UpdateAPK:             function(/* url, failStr, failDlStr */) {
+            // Upstream showed the load dialog and persisted IsUpDating=true
+            // right before calling — undo both or the app is stuck on the
+            // loading screen.
+            if (typeof window.Main_HideLoadDialog === 'function') window.Main_HideLoadDialog();
+            if (window.Main_values && window.Main_values.IsUpDating) {
+                window.Main_values.IsUpDating = false;
+                if (typeof window.Main_SaveValues === 'function') window.Main_SaveValues();
+            }
+            _showToast('Self-install isn’t supported on webOS — update via github.com/tcarcao/smarttwitchtv-webos/releases');
+        },
+        // Test seam (app/tests/player-hls.html asserts the comparator).
+        _isNewerVersion:       function(remote, local) { return _isNewerVersion(remote, local); }
     };
 
     // Default-fallback: log unmapped property accesses but DON'T throw.
@@ -763,19 +782,6 @@
         var origGetSuccess = window.AddUser_getDeviceCodeSuccess;
         var origSaveNew    = window.AddUser_SaveNewUser;
         var pending = null;
-
-        // CRITICAL: upstream's Main_CheckFullxmlHttpGet looks up the callback
-        // via `eval(callbackSuccess.name)`. If `.name` is empty, eval('')
-        // returns undefined and the device-grant polling chain dies silently
-        // (login never completes). Named function expressions LOOK like they
-        // preserve `.name`, but vite's minifier rewrites identifier names in
-        // bundled builds — `.name` ends up as 's' or similar. The only
-        // reliable fix is to set `.name` explicitly via defineProperty,
-        // which the minifier doesn't touch because the name is a string.
-        function _setName(fn, name) {
-            try { Object.defineProperty(fn, 'name', {value: name, configurable: true}); } catch (e) {}
-            return fn;
-        }
 
         window.AddUser_getDeviceCodeSuccess = _setName(function(resultObj) {
             if (resultObj && resultObj.status === 200 && resultObj.responseText) {
@@ -1002,10 +1008,101 @@
         setTimeout(_notifPollOnce, NOTIF_INITIAL_DELAY_MS);
     }
 
+    // CRITICAL: upstream's Main_CheckFullxmlHttpGet looks up callbacks via
+    // `eval(callbackSuccess.name)`. If `.name` is empty, eval('') returns
+    // undefined and the calling chain dies silently. Named function
+    // expressions LOOK like they preserve `.name`, but vite's minifier
+    // rewrites identifier names in bundled builds — `.name` ends up as 's'
+    // or similar. The only reliable fix is to set `.name` explicitly via
+    // defineProperty, which the minifier doesn't touch (string literal).
+    // Used by every monkey-patch that replaces an upstream global function.
+    function _setName(fn, name) {
+        try { Object.defineProperty(fn, 'name', {value: name, configurable: true}); } catch (e) {}
+        return fn;
+    }
+
+    // ============ Update check (GitHub Releases) ============
+    //
+    // Upstream's Main_CheckUpdate only fetches when the app runs from
+    // https://fgl27.github.io (the Android model: the hosted page IS the
+    // app). Our port is fully packaged, so we replace the function body —
+    // keeping upstream's scheduling, dialog, and changelog rendering — with
+    // a check against our release pipeline's version.json. The stable
+    // `latest/download` URL always points at the newest GitHub Release.
+    var UPDATE_VERSION_URL = 'https://github.com/tcarcao/smarttwitchtv-webos/releases/latest/download/version.json';
+
+    function _isNewerVersion(remote, local) {
+        if (!remote || !local) return false;
+        var r = String(remote).split('.');
+        var l = String(local).split('.');
+        var len = Math.max(r.length, l.length);
+        for (var i = 0; i < len; i++) {
+            var a = parseInt(r[i], 10) || 0;
+            var b = parseInt(l[i], 10) || 0;
+            if (a !== b) return a > b;
+        }
+        return false;
+    }
+
+    function _updateCheckSettle() {
+        window.Main_Ischecking = false;
+        if (typeof window.Main_getclock === 'function') {
+            window.Main_UpdateDialogLastCheck = window.Main_getclock();
+        }
+        if (typeof window.Main_UpdateDialogTitle === 'function') window.Main_UpdateDialogTitle();
+        if (typeof window.Main_UpdateDialogSetTitle === 'function') window.Main_UpdateDialogSetTitle();
+    }
+
+    function _installUpdateCheck() {
+        if (typeof window.Main_CheckUpdate !== 'function' ||
+            typeof window.Main_WarnUpdate !== 'function' ||
+            !window.version) {
+            return;
+        }
+        window.Main_CheckUpdate = _setName(function(forceUpdate) {
+            if (!window.checkUpdates) return;
+            // Mirror upstream's background-update suppression.
+            if (window.Main_HasUpdate && !forceUpdate &&
+                typeof window.Main_isUpdateDialogVisible === 'function' && window.Main_isUpdateDialogVisible() &&
+                window.Settings_value && window.Settings_value.update_background &&
+                window.Settings_value.update_background.defaultValue) {
+                return;
+            }
+            Platform.device.packageVersion().then(function(current) {
+                if (!current) {
+                    _updateCheckSettle();
+                    return null;
+                }
+                return Platform.http.request({url: UPDATE_VERSION_URL, timeoutMs: 8000}).then(function(res) {
+                    var body = typeof res.body === 'string' ? JSON.parse(res.body) : res.body;
+                    if (body && body.version && _isNewerVersion(body.version, current)) {
+                        window.version.ApkUrl = body.ipkUrl || '';
+                        window.version.changelog = body.changelog && body.changelog.length
+                            ? body.changelog
+                            : [{title: 'Version ' + body.version, changes: []}];
+                        window.Main_HasUpdate = true;
+                        window.Main_IsWebupdate = false;
+                        window.Main_WarnUpdate(false);
+                        _updateCheckSettle();
+                    } else {
+                        _updateCheckSettle();
+                        if (typeof window.Main_isUpdateDialogVisible === 'function' && window.Main_isUpdateDialogVisible()) {
+                            _showToast(typeof window.STR_NO_UPDATES !== 'undefined' ? window.STR_NO_UPDATES : 'No updates');
+                        }
+                    }
+                });
+            }).catch(function() {
+                _updateCheckSettle();
+                if (typeof window.Main_CheckUpdateFail === 'function') window.Main_CheckUpdateFail();
+            });
+        }, 'Main_CheckUpdate');
+    }
+
     function _bootShimPatches() {
         _installRefreshTokenCapture();
         _installTokenRefreshScheduler();
         _installLiveNotifier();
+        _installUpdateCheck();
     }
 
     // Debug hook (test-only): expose helpers on a single window namespace
