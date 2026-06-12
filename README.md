@@ -37,6 +37,21 @@ Upstream's app JS calls a native Android bridge (`Android.*` /
 Permanent platform/hardware limitations are recorded as ADRs in
 [`docs/adrs/`](docs/adrs/). Remaining work: [`TODO.md`](TODO.md).
 
+## Install on a TV
+
+Prerequisites: [LG Developer Mode](https://webostv.developer.lge.com/develop/getting-started/developer-mode-app)
+enabled on the TV, and the webOS CLI (`npm i -g @webos-tools/cli`) with the TV
+registered (`bash release/scripts/tv-setup.sh <tv-ip>`). Note that Dev Mode
+sessions expire (~50 h) unless extended in the Dev Mode app.
+
+Install the latest [release](https://github.com/tcarcao/smarttwitchtv-webos/releases):
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/tcarcao/smarttwitchtv-webos/main/release/scripts/install-from-github.sh | bash -s -- webostv
+```
+
+or from a clone: `bash release/scripts/install-from-github.sh <device-name>`.
+
 ## Development
 
 ```bash
