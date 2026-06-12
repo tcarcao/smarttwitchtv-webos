@@ -734,7 +734,9 @@
                 window.Main_values.IsUpDating = false;
                 if (typeof window.Main_SaveValues === 'function') window.Main_SaveValues();
             }
-            _showToast('Self-install isn’t supported on webOS — update via github.com/tcarcao/smarttwitchtv-webos/releases');
+            // TODO(i18n): upstream's STR_* language tables don't cover this
+            // sentence; ships English-only until the shim grows a string table.
+            _showToast('Updates will install automatically once the app is in the LG Content Store. Until then: github.com/tcarcao/smarttwitchtv-webos/releases');
         },
         // Test seam (app/tests/player-hls.html asserts the comparator).
         _isNewerVersion:       function(remote, local) { return _isNewerVersion(remote, local); }
@@ -1059,6 +1061,34 @@
             !window.version) {
             return;
         }
+
+        // Until the first successful check replaces it, the baked-in
+        // changelog is the ANDROID app's release history — show a pointer
+        // instead of another product's notes.
+        window.version.changelog = [{
+            title: 'SmartTwitchTV for webOS',
+            changes: [
+                'Release notes load from GitHub when the update check runs.',
+                'All releases: github.com/tcarcao/smarttwitchtv-webos/releases'
+            ]
+        }];
+
+        // Upstream's Main_Changelog hardcodes the Android changelog link
+        // (tinyurl.com/sttvchanges) into the dialog header — post-process
+        // the rendered HTML to point at this port's releases page.
+        if (typeof window.Main_Changelog === 'function') {
+            var origChangelog = window.Main_Changelog;
+            window.Main_Changelog = _setName(function() {
+                var ret = origChangelog.apply(this, arguments);
+                var el = document.getElementById('dialog_changelod_text');
+                if (el && el.innerHTML.indexOf('tinyurl.com/sttvchanges') !== -1) {
+                    el.innerHTML = el.innerHTML
+                        .split('https://tinyurl.com/sttvchanges')
+                        .join('github.com/tcarcao/smarttwitchtv-webos/releases');
+                }
+                return ret;
+            }, 'Main_Changelog');
+        }
         window.Main_CheckUpdate = _setName(function(forceUpdate) {
             if (!window.checkUpdates) return;
             // Mirror upstream's background-update suppression.
@@ -1075,11 +1105,19 @@
                 }
                 return Platform.http.request({url: UPDATE_VERSION_URL, timeoutMs: 8000}).then(function(res) {
                     var body = typeof res.body === 'string' ? JSON.parse(res.body) : res.body;
-                    if (body && body.version && _isNewerVersion(body.version, current)) {
+                    if (!body || !body.version) {
+                        _updateCheckSettle();
+                        return;
+                    }
+                    // Always adopt the fetched changelog — the packaged
+                    // upstream `version` object ships the ANDROID app's
+                    // release history, which the Changes button would
+                    // otherwise render.
+                    if (body.changelog && body.changelog.length) {
+                        window.version.changelog = body.changelog;
+                    }
+                    if (_isNewerVersion(body.version, current)) {
                         window.version.ApkUrl = body.ipkUrl || '';
-                        window.version.changelog = body.changelog && body.changelog.length
-                            ? body.changelog
-                            : [{title: 'Version ' + body.version, changes: []}];
                         window.Main_HasUpdate = true;
                         window.Main_IsWebupdate = false;
                         window.Main_WarnUpdate(false);

@@ -9,6 +9,12 @@ Items that still need work. Permanent platform/hardware limitations are in
 
 - **Multi-user.** Login flow works, but multi-user UX (switch users, login a 2nd account) not exercised. Upstream supports it via `AddUser_UsernameArray` being an array; should work but unverified.
 
+- **Shim-injected strings aren't localized.** Toasts the platform layer adds
+  (update guidance, playback-speed warning, "X is live" notifications) are
+  hardcoded English; upstream's `STR_*` language tables don't cover them.
+  Needs a small string table in PlatformShim keyed off upstream's language
+  setting.
+
 ## Tooling — quality-of-life
 
 - **`debug:tv` rough edges:**
