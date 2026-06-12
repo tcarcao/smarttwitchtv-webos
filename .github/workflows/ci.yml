@@ -1,0 +1,31 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  build-ipk:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # Node 22 LTS pinned: @webos-tools/cli crashes post-package on
+      # Node 24 (rimraf TypeError) — see release/README.md.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install webOS CLI
+        run: npm install -g @webos-tools/cli
+
+      - name: Build IPK
+        run: bash release/scripts/build-webos.sh
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ipk
+          path: dist-ipk/*.ipk
+          if-no-files-found: error

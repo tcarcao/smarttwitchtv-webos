@@ -1,0 +1,63 @@
+name: Release
+
+# Tag vX.Y.Z → GitHub Release carrying the IPK (versioned filename) and a
+# version.json the app's update check reads via the stable URL:
+#   https://github.com/<repo>/releases/latest/download/version.json
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # Node 22 LTS pinned: @webos-tools/cli crashes post-package on Node 24.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install webOS CLI
+        run: npm install -g @webos-tools/cli
+
+      - name: Stamp appinfo version from tag
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          node -e '
+            const fs = require("fs");
+            const f = "webos/appinfo.json";
+            const j = JSON.parse(fs.readFileSync(f, "utf8"));
+            j.version = process.argv[1];
+            fs.writeFileSync(f, JSON.stringify(j, null, 4) + "\n");
+          ' "$VERSION"
+          grep '"version"' webos/appinfo.json
+
+      - name: Build IPK
+        run: bash release/scripts/build-webos.sh
+
+      - name: Generate version.json
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          IPK_NAME="$(basename "$(ls dist-ipk/*.ipk)")"
+          cat > dist-ipk/version.json <<EOF
+          {
+            "version": "${VERSION}",
+            "ipkUrl": "https://github.com/${GITHUB_REPOSITORY}/releases/download/${GITHUB_REF_NAME}/${IPK_NAME}",
+            "publishedAt": "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          }
+          EOF
+          cat dist-ipk/version.json
+
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" \
+            dist-ipk/*.ipk dist-ipk/version.json \
+            --title "$GITHUB_REF_NAME" \
+            --generate-notes
